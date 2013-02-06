@@ -1,0 +1,50 @@
+#!/usr/bin/perl
+(my$d=q[AA                GTCAGTTCCT
+  CGCTATGTA                 ACACACACCA
+    TTTGTGAGT                ATGTAACATA
+      CTCGCTGGC              TATGTCAGAC
+        AGATTGATC          GATCGATAGA
+          ATGATAGATC     GAACGAGTGA
+            TAGATAGAGT GATAGATAGA
+              GAGAGA GATAGAACGA
+                TC GATAGAGAGA
+                 TAGATAGACA G
+               ATCGAGAGAC AGATA
+             GAACGACAGA TAGATAGAT
+           TGAGTGATAG    ACTGAGAGAT
+         AGATAGATTG        ATAGATAGAT
+       AGATAGATAG           ACTGATAGAT
+     AGAGTGATAG             ATAGAATGAG
+   AGATAGACAG               ACAGACAGAT
+  AGATAGACAG               AGAGACAGAT
+  TGATAGATAG             ATAGATAGAT
+  TGATAGATAG           AATGATAGAT
+   AGATTGAGTG        ACAGATCGAT
+     AGAACCTTTCT   CAGTAACAGT
+       CTTTCTCGC TGGCTTGCTT
+         TCTAA CAACCTTACT
+           G ACTGCCTTTC
+           TGAGATAGAT CGA
+         TAGATAGATA GACAGAC
+       AGATAGATAG  ATAGAATGAC
+     AGACAGAGAG      ACAGAATGAT
+   CGAGAGACAG          ATAGATAGAT
+  AGAATGATAG             ACAGATAGAC
+  AGATAGATAG               ACAGACAGAT
+  AGACAGACTG                 ATAGATAGAT
+   AGATAGATAG                 AATGACAGAT
+     CGATTGAATG               ACAGATAGAT
+       CGACAGATAG             ATAGACAGAT
+         AGAGTGATAG          ATTGATCGAC
+           TGATTGATAG      ACTGATTGAT
+             AGACAGATAG  AGTGACAGAT
+               CGACAGA TAGATAGATA
+                 GATA GATAGATAG
+                    ATAGACAGA G
+                  AGATAGATAG ACA
+                GTCGCAAGTTC GCTCACA
+])=~s/\s+//g;%a=map{chr $_=>$i++}65,84,67,
+71;$p=join$;,keys%a;while($d=~/([$p]{4})/g
+){next if$j++%96>=16;$c=0;for$d(0..3){$c+=
+$a{substr($1,$d,1)}*(4**$d)}$perl.=chr $c}
+             eval $perl;

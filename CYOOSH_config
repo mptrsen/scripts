@@ -1,0 +1,133 @@
+#==============================================================================#
+#                                   CYOOSH Config                              #
+#==============================================================================#
+
+#===================================== README =================================#
+# Use this pattern (# = ignore line) to provide the perl program CYOOSH.pl 
+# with the necessary information.
+
+# REQUIREMENTS FOR PROPER RUNNING:
+
+#   - GENERAL
+#       - Never feed RNA sequences to the program or to HAMSTR (DNA also not supported)
+#       - When calling the program, give it the path to this config file on the 
+#            command line
+#       - Provide data as requested below
+#       - The lines #==INFO==# and #==TAXA==# must be kept
+#       - Fasta files need to be named after the orthologous gene they are 
+#            containing
+#       - Headers of sequences should follow this pattern:
+#
+#             >ABBR|...
+#
+#               - ABBR is the species name abbreviation   
+#               - the rest after the pipe sign is ignored
+#       - 'adjust_aa_headers' / 'adjust_nt_headers' = yes -> insert OGS version 
+#            into header
+
+#   - INFO (see below)
+#       - Do not change the statement names but only the info given after '='  
+#       - Paths, names, options may not contain whitespace -------------------------tickmarks?
+#       - Paths have to be absolute!
+#       - Options:
+#           - 'adjust_aa_headers', 'adjust_nt_headers', 'align_all', 
+#               'overwrite':
+#               - Yes or no
+#                   - No in overwrite will make the program die as soon as it 
+#                       runs across an existing directory!
+#           - 'stockh_header_width':
+#               - Any integer between 0 (not recommended!, deletes headers) and 
+#                    255 
+#                   - Choose this integer depending on your original 
+#                       fasta-headers, add ~ 10
+#                   - A minimum of 50 is recommended
+#           - 'align_all':
+#               - 'mafft_linsi' (probably most accurate method of mafft, 
+#                   very slow)
+#               - 'mafft_einsi' (suitable for seqs containing large unalignable 
+#                   regions)
+#               - 'muscle'
+#       - Paths to linsi, einsi and muscle may be omitted if 'align_all' = no 
+#           (not recommended)
+#       - Original AA -> used for all steps of set creation
+#       - Original NT -> used only (!) for generation of nucleotide set fasta
+#           for comparison
+
+#   - TAXA (see examples below)
+#       - List each taxon, the abbreviation used in the headers of your fastas 
+#           and the version of the used genome (in this order!)
+#       - Each statement (name / abbr. / version) may not contain whitespace
+#       - If OGS version is unknown, do not omit the statement but type '?' or 
+#           something similar (and disable 'adjust_all_fa_headers')
+
+#=================================== INFO =====================================#
+# Info  (do not change) |   Example (adjust to your needs)                
+#-------------------------------------------------------------------------------
+
+# DESTINATION & SET NAME
+
+path                   = /home/mpetersen/DFG_Paper/DFG_set2/z_final_set_2
+set_name               = dfgset2_2012
+
+# OPTIONS (see above for alternatives)
+
+overwrite              = yes
+adjust_aa_headers      = yes
+adjust_nt_headers      = yes
+stockh_header_width    = 50
+align_all              = yes
+mafft_or_muscle        = mafft_linsi
+
+# IMPORTANT PATHS
+
+# path to the orthologous amino-acid sequences. 
+# these must be grouped into files that are named by the genes they contain.
+
+path_to_orig_AA        = /home/mpetersen/DFG_Paper/DFG_set2/z_final_set_2/zzz_03_EOGs_einzeln
+#
+# path to the corresponding nucleotide sequences. 
+# these must be grouped into files that are named by the genes they contain.
+
+path_to_orig_NT        = /home/mpetersen/tmp/jeanne/genes_nt
+#
+# path to the proteomes. the file names must contain the full taxon name 
+# as written in the taxa section.
+
+path_to_orig_prot      = /home/mpetersen/DFG_Paper/DFG_set2/z_final_set_2/proteomes
+
+#
+# paths to programs. must be absolute.
+path_to_linsi_prog     = /home/mpetersen/local/bin/linsi
+path_to_einsi_prog     = /home/mpetersen/local/bin/einsi
+path_to_muscle_prog    = /home/mpetersen/local/bin/muscle
+path_to_hmmbuild_prog  = /usr/local/bin/hmmbuild
+path_to_mkblastdb_prog = /usr/local/bin/makeblastdb
+path_to_exonerate_prog = /usr/local/bin/exonerate
+
+#==================================== TAXA ====================================#
+# Species             | Abbr. | OGS Version   | Comments
+#-------------------------------------------------------------------------------
+
+Acyrtosiphon_pisum      APISU	1.0
+Aedes_aegypti           AAEGY	1.2
+Anopheles_gambiae       AGAMB	3.5
+Apis_mellifera          AMELL	pre_release2
+Bombyx_mori             BMORI	2.0
+Culex_quinquefasciatus  CQUIN	1.2
+Daphnia_pulex           DPULE	2.0
+Drosophila_melanogaster DMELA	5.29
+Drosophila_persimilis   DPERS	1.3
+Linepithema_humile      LHUMI	1.1
+Nasonia_vitripennis	    NVITR	1.2
+Pediculus_humanus	      PHUMA	1.2
+Pogonomyrmex_barbatus	  PBARB	1.1
+Tribolium_castaneum     TCAST	3.0
+
+
+# based on README.txt (/home/jeanne/Desktop/Hymi-Orthologenset/
+#   Analyzed_genomes/Official_gene_sets)
+
+#================================== IMPRINT ===================================#
+
+# Written by Jeanne Wilbrandt (jeanne.wibrandt@uni-bonn.de), 2011/12
+# Modified and run by Malte, Wed Mar 14 18:36:26 CET 2012
