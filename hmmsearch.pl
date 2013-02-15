@@ -35,7 +35,7 @@ $hmm =~ /\.hmm$/ or die "Fatal: First argument must be a HMM file\n$usage" ;
 
 unless (-f $hmm) { die "Fatal: HMM file '$hmm' does not exist\n" }
 
-unless (-d $outdir) { die "Fatal: Output directory '$outdir' does not exist\n" }
+unless (-d $outdir) { mkdir $outdir or die "Fatal: could not create output directory '$outdir': $!\n" }
 
 defined $reportfile or $reportfile = File::Spec->catfile(basename($hmm, '.hmm') . '.txt');
 
@@ -136,7 +136,7 @@ foreach my $assfile (@ARGV) {
 	# free mem
 	undef $fh;
 	undef $sequences;
-	print STDOUT "$num_hits hits for $assfile\n";
+	print STDOUT "$num_hits hits for $hmm in $assfile\n";
 }
 
 # slurp a fasta file
@@ -194,6 +194,50 @@ sub close {
 	undef($self);
 }
 1;
+
+=head1 SYNOPSIS
+
+  hmmsearch.pl [OPTIONS]... HMMFILE ASSEMBLYFILES
+
+=head1 IMPORTANT NOTICE
+
+Make sure you double-check the assembly list at the end of this script. It must
+be up to date and match your assembly files, or this script will be unable to
+print out the correct species names!
+
+=head1 OPTIONS
+
+=head2 -E EVALUE
+
+Specify the e-value threshold for the HMM search.
+
+=head2 -h
+
+Print short help message.
+
+=head2 -hmmsearch /PATH/TO/HMMSEARCH
+
+Specify the path to F<hmmsearch>.
+
+=head2 -max
+
+Toggle max sensitivity mode for the HMM search.
+
+=head2 -ncpu NCPU
+
+Specify the maximum number of CPUs to use for F<hmmsearch>. Useful when running
+in parallel environments, and recommended because if unset, F<hmmsearch> will
+try to use all available CPUs, which may crash your cluster.
+
+=head2 -outdir OUTDIR
+
+Specify the output directory. 
+
+=head2 -reportfile REPORTFILE
+
+Specify the report file.
+
+=cut
 
 __END__
 INSbusTBNRABPEI-121	Andrena vaga
@@ -600,4 +644,3 @@ INShkeTBSRAAPEI-13	Trichogramma evanescens
 INShkeTBURAAPEI-15	Paratemnopteryx couloniana
 INShkeTBVRAAPEI-16	Hydrochus megaphallus
 INShkeTBWRAAPEI-17	Diplectrona sp.
-	 
