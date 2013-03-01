@@ -8,7 +8,7 @@ use IO::File;
 use Data::Dumper;
 use Getopt::Long;
 
-my $outdir            = '.';
+my $outdir            = undef;
 my $reportfile        = undef;
 my $hmmsearch         = '/share/scientific_bin/hmmer-3.0/hmmsearch';
 my $evalue_threshold  = '10e-5';
@@ -29,15 +29,19 @@ GetOptions(
 	'h|help'       => \$help,
 ) or die;
 
+# check input 
+#
 if ($help) { print $usage and exit; }
 my $hmm = shift(@ARGV) or die($usage);
 $hmm =~ /\.hmm$/ or die "Fatal: First argument must be a HMM file\n$usage" ;
 
 unless (-f $hmm) { die "Fatal: HMM file '$hmm' does not exist\n" }
 
+$outdir //= File::Spec->catfile(basename($hmm) . '_out');
+
 unless (-d $outdir) { mkdir $outdir or die "Fatal: could not create output directory '$outdir': $!\n" }
 
-defined $reportfile or $reportfile = File::Spec->catfile(basename($hmm, '.hmm') . '.txt');
+$reportfile //= File::Spec->catfile(basename($hmm, '.hmm') . '.txt');
 
 $max = $max ? '--max' : '';
 

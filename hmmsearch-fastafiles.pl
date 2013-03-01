@@ -8,20 +8,42 @@ use IO::File;
 use Data::Dumper;
 use Getopt::Long;
 
-my $outdir = '.';
-my $hmmsearch = '/share/scientific_bin/hmmer-3.0/hmmsearch';
-my $evalue_threshold = '10e-5';
-my $data = {};
-my %species = ();
+my $outdir            = undef;
+my $reportfile        = undef;
+my $hmmsearch         = '/share/scientific_bin/hmmer-3.0/hmmsearch';
+my $evalue_threshold  = '10e-5';
+my $max               = 0;
+my $ncpu              = 1;
+my $data              = {};
+my $help;
+my %species           = ();
+my $usage             = "Usage: $0 [OPTIONS]... HMMFILE ASSEMBLYFILES\n";
 
 GetOptions(
-	'outdir=s'    => \$outdir,
-	'hmmsearch=s' => \$hmmsearch,
-	'E=s'         => \$evalue_threshold,
-);
+	'outdir=s'     => \$outdir,
+	'reportfile=s' => \$reportfile,
+	'hmmsearch=s'  => \$hmmsearch,
+	'E=f'          => \$evalue_threshold,
+	'max'          => \$max,
+	'ncpu=i'       => \$ncpu,
+	'h|help'       => \$help,
+) or die;
 
-my $hmm = shift(@ARGV);
-($hmm =~ /\.hmm$/) or die("Usage: $0 HMMFILE ASSEMBLYFILES: $hmm\n");
+# check input 
+#
+if ($help) { print $usage and exit; }
+my $hmm = shift(@ARGV) or die($usage);
+$hmm =~ /\.hmm$/ or die "Fatal: First argument must be a HMM file\n$usage" ;
+
+unless (-f $hmm) { die "Fatal: HMM file '$hmm' does not exist\n" }
+
+$outdir //= File::Spec->catfile(basename($hmm) . '_out');
+
+unless (-d $outdir) { mkdir $outdir or die "Fatal: could not create output directory '$outdir': $!\n" }
+
+$reportfile //= File::Spec->catfile(basename($hmm, '.hmm') . '.txt');
+
+$max = $max ? '--max' : '';
 
 # get the assembly->species list
 while (<DATA>) {
@@ -30,83 +52,95 @@ while (<DATA>) {
 	$species{$cols[0]} = $cols[1];
 }
 
+my $reportfh = IO::File->new($reportfile, 'w');
+
+# what HMM we are using
+print  $reportfh "########################################################\n";
+printf $reportfh "# Results for %s with e-value threshold %1.1e %s\n", basename($hmm), $evalue_threshold, $max;
+print  $reportfh "########################################################\n";
+
 # go through all assembly files
 foreach my $assfile (@ARGV) {
 	# output file name
 	my $outfile = File::Spec->catfile($outdir, basename($assfile) . '.domtblout');
 
 	# do the HMM search with specified settings
-	system(qq($hmmsearch -E $evalue_threshold --max --domtblout $outfile $hmm $assfile))
-		and die("hmmsearch failed for $assfile\: $!\n");
+	system(qq($hmmsearch -E $evalue_threshold $max --cpu $ncpu -o /dev/null --domtblout $outfile $hmm $assfile))
+		and die("Fatal: hmmsearch failed for $assfile\: $!\n");
 
-	# open output file
-	my $fh = IO::File->new($outfile);
+
+	# open hmmsearch output file
+	my $fh = IO::File->new(File::Spec->catfile($outfile));
+
+	# number of hits for this search
+	my $num_hits = 0;
+
+	# slurp assembly file
+	my $sequences = &slurpfasta($assfile);
+
+	# read the hmmsearch domtblout file
 	while (<$fh>) {
 		# skip comments and empty lines
 		next if /^#/;
 		next if /^\s*$/;
 
+		# print this stuff only once
+		if ($num_hits == 0) {
+			# assembly information
+			(my $assembly = basename($assfile)) =~ s/.*INS/INS/;
+			$assembly =~ s/_(e[135]).*//;
+			printf $reportfh "# Assembly: %s [%s] (%s)\n",
+				$assembly,
+				$1,
+				$species{$assembly},
+			;
+			# field info
+			printf $reportfh "# %- 90s %8s %5s %8s %6s %8s %-8s\n",
+				'target_name',
+				'i-Evalue',
+				'score',
+				'ali_from',
+				'ali_to',
+				'env_from',
+				'env_to',
+			;
+			# lines
+			printf $reportfh "# %- 90s %8s %5s %-8s %6s %-8s %-8s\n",
+				'-' x 66,
+				'-' x 8,
+				'-' x 5,
+				'-' x 8,
+				'-' x 6,
+				'-' x 8,
+				'-' x 6,
+			;
+		}
+
+		# we found something; also make sure the above gets printed only once
+		++$num_hits;
+
 		# split by whitespace
-		my @fields = split;
+		my @fields = split(/\s+/, $_, 23);
+		chomp(@fields);
 
-		# initialize the array only once
-		unless(ref($$data{$assfile})) { $$data{$assfile} = [] }
-		
-		# store data
-		push(@{$$data{$assfile}}, {
-			# concatenate because hmmsearch splits the header after the first whitespace
-			'target_name' => $fields[0] . ' ' . $fields[22],
-			'i-Evalue'    => $fields[12],
-			'score'       => $fields[13],
-			'ali_from'    => $fields[17],
-			'ali_to'      => $fields[18],
-			'env_from'    => $fields[19],
-			'env_to'      => $fields[20]
-		});
-
-		foreach my $i (0..$#{$data{$assfile}}) {
-			printf("%s %s %s %s %s %s %s\n", $data->{$assfile}->[$i]->{$_}) foreach keys %{$data{$assfile}[$i]};
-		}
-		exit;
+		# print data
+		printf $reportfh ">%- 67s %4.1e %- 6.1f %-8d %-8d %-8d %-8d\n%s\n", 
+			$fields[0] . ' ' . $fields[22],
+			$fields[12],
+			$fields[13],
+			$fields[17],
+			$fields[18],
+			$fields[19],
+			$fields[20],
+			$sequences->{$fields[0] . ' ' . $fields[22]}
+		;
 	}
+	# record separator only if found something
+	print $reportfh "#\n" unless $num_hits == 0;
 	# free mem
-	undef($fh);
-}
-
-# output
-foreach my $ass (keys %$data) {
-	# parse the assembly ID from the filename
-	(my $assembly = basename($ass)) =~ s/.*INS/INS/;
-	$assembly =~ s/_.*//;
-
-	printf("# Assembly: %s (%s)\n", $assembly, $species{$assembly});
-
-	# each data element is a list of hashes
-	foreach my $hitlist (@$data{$ass}) {
-		printf("# %- 46s %8s %5s %8s %6s %8s %-8s\n", 'target_name', 'i-Evalue', 'score', 'ali_from', 'ali_to', 'env_from', 'env_to');
-		printf("# %- 46s %8s %5s %-8s %6s %-8s %-8s\n", '-' x 46, '-' x 8, '-' x 5, '-' x 8, '-' x 6, '-' x 8, '-' x 6);
-
-		# get the hit sequences
-		my $sequences = &slurpfasta($ass);
-
-		foreach my $hit (@$hitlist) {
-			printf(">%- 47s %4.1e %- 6.1f %-8d %-8d %-8d %-8d\n%s\n", 
-				$$hit{'target_name'},
-				$$hit{'i-Evalue'},
-				$$hit{'score'},
-				$$hit{'ali_from'},
-				$$hit{'ali_to'},
-				$$hit{'env_from'},
-				$$hit{'env_to'},
-				$$sequences{$$hit{'target_name'}}
-			);
-		}
-
-		# free mem
-		undef($sequences);
-	}
-	# record separator
-	print "#\n";
+	undef $fh;
+	undef $sequences;
+	print STDOUT "$num_hits hits for $hmm in $assfile\n";
 }
 
 # slurp a fasta file
@@ -119,78 +153,97 @@ sub slurpfasta {
 	while (my ($h, $s) = $fh->next_seq()) {
 		$$content{$h} = $s;
 	}
-	undef $fh;
+	$fh->close();
 	return $content;
 }
 
+# Object-oriented fasta file interface
 package Seqload::Fasta;
 use Carp;
-
 # Constructor. Returns a sequence database object.
 sub open {
-  my ($class, $filename) = @_;
-  open (my $fh, '<', $filename)
-    or confess "Fatal: Could not open $filename\: $!\n";
-  my $self = {
-    'filename' => $filename,
-    'fh'       => $fh
-  };
-  bless($self, $class);
-  return $self;
+	my ($class,$fn)=@_;
+	open(my $fh, '<', $fn)
+		or confess "Fatal: Could not open $fn\: $!\n";
+	my $self={
+		'fn'=>$fn,
+		'fh'=>$fh
+	};
+	bless($self,$class);
+	return $self;
 }
-
 # Returns the next sequence as an array (hdr, seq). 
-# Useful for looping through a seq database.
 sub next_seq {
-  my $self = shift;
-  my $fh = $self->{'fh'};
-  local $/ = "\n>"; # change the line separator
-  return unless defined(my $item = readline($fh));  # read the line(s)
-  chomp $item;
-  
-  if ($. == 1 and $item !~ /^>/) {  # first line is not a header
-    croak "Fatal: " . $self->{'filename'} . " is not a FASTA file: Missing descriptor line\n";
-  }
-
-  $item =~ s/^>//;
-
-  my ($hdr, $seq) = split(/\n/, $item, 2);
-  $seq =~ s/>//g if defined $seq;
-  $seq =~ s/\s+//g if defined $seq; # remove all whitespace, including newlines
-
-  return($hdr, $seq);
+	my $self=shift;
+	my $fh=$self->{'fh'};
+	local $/="\n>"; # change the line separator
+	return unless defined(my $l=readline($fh));  # read the line(s)
+	chomp $l;
+	croak "Fatal: ".$self->{'fn'}."is not a FASTA file: Missing header line\n"
+		if ($.==1 and $l!~/^>/);
+	$l=~s/^>//;
+	my ($h,$s)=split(/\n/,$l,2);
+	if (defined $s) {
+		$s=~s/>//g;
+		$s=~s/\s+//g # remove all whitespace, including newlines
+	}
+	return($h,$s);
 }
-
 # Destructor. Closes the file and undefs the database object.
 sub close {
-  my $self = shift;
-  my $fh = $self->{'fh'};
-  my $filename = $self->{'filename'};
-  close($fh) or croak "Fatal: Could not close $filename\: $!\n";
-  undef($self);
+	my $self=shift;
+	my $fh=$self->{'fh'};
+	my $fn=$self->{'fn'};
+	close($fh) or carp("Warning: Could not close $fn\: $!\n");
+	undef($self);
 }
-
-# I dunno if this is required but I guess this is called when you undef() an object
-sub DESTROY {
-  my $self = shift;
-  $self->close;
-}
-
-
-# validates a fasta file by looking at the FIRST (header, sequence) pair
-# arguments: scalar string path to file
-# returns: true on validation, false otherwise
-sub check_if_fasta {
-	my $infile = shift;
-	my $infh = Seqload::Fasta->open($infile);
-	my ($h, $s) = $infh->next_seq() or return 0;
-	return 1;
-}
-# return true
 1;
 
+=head1 SYNOPSIS
+
+  hmmsearch.pl [OPTIONS]... HMMFILE ASSEMBLYFILES
+
+=head1 IMPORTANT NOTICE
+
+Make sure you double-check the assembly list at the end of this script. It must
+be up to date and match your assembly files, or this script will be unable to
+print out the correct species names!
+
+=head1 OPTIONS
+
+=head2 -E EVALUE
+
+Specify the e-value threshold for the HMM search.
+
+=head2 -h
+
+Print short help message.
+
+=head2 -hmmsearch /PATH/TO/HMMSEARCH
+
+Specify the path to F<hmmsearch>.
+
+=head2 -max
+
+Toggle max sensitivity mode for the HMM search.
+
+=head2 -ncpu NCPU
+
+Specify the maximum number of CPUs to use for F<hmmsearch>. Useful when running
+in parallel environments, and recommended because if unset, F<hmmsearch> will
+try to use all available CPUs, which may crash your cluster.
+
+=head2 -outdir OUTDIR
+
+Specify the output directory. 
+
+=head2 -reportfile REPORTFILE
+
+Specify the report file.
+
+=cut
+
 __END__
-INSbusTBSRABPEI-146	Neotermes cubanus
 INSbusTBNRABPEI-121	Andrena vaga
 INSbusTBGRABPEI-127	Anthophora plumipes
 INSbusTBCRABPEI-135	Bibio marci
@@ -199,7 +252,7 @@ INSbusTBHRABPEI-138	Chrysura austriaca
 INSbusTBRRAAPEI-83	Cleptes nitidulus
 INSbusTBARABPEI-119	Colletes cunicularius
 INSbusTBLRAAPEI-77	Corythucha ciliata
-INSbusTBDRAAPEI-79	Eriocrania cf. subpurpurella
+INSbusTBDRAAPEI-79	Eriocrania cf.
 INSbusTBIRAAPEI-84	Hedychrum nobile
 INSbusTBQRAAPEI-82	Nomada lathburiana
 INSbusTBFRABPEI-126	Osmia cornuta
@@ -291,7 +344,7 @@ INSnfrTAURAAPEI-8	Chrysis mixta
 INSnfrTAVRAAPEI-9	Triodia sylvina
 INSnfrTAWRAAPEI-11	Episyrphus balteatus
 INSnfrTAXRAAPEI-12	Pseudomalus pusillus
-INSnfrTAYRAAPEI-13	Anthocharis  cardamines
+INSnfrTAYRAAPEI-13	Anthocharis cardamines
 INSnfrTAZRAAPEI-14	Pentachrysis inaequalis
 INSnfrTASRAAPEI-41	Chrysis analis
 INSnfrTBBRAAPEI-16	Mesembrina meridiana
@@ -299,7 +352,7 @@ INSnfrTBDRAAPEI-18	Hedychridium ardens
 INSnfrTBERAAPEI-19	Gyrinus marinus
 INSnfrTBFRAAPEI-90	Triarthria setipennis
 INSnfrTBGRAAPEI-93	Donacia marginata
-INSnfrTBHRAAPEI-94	Trigoniophthalmus cf. alternatus
+INSnfrTBHRAAPEI-94	Trigoniophthalmus cf.
 INSnfrTBIRAAPEI-95	Ceuthophilus sp.
 INSnfrTBJRAAPEI-8	Hydroptilidae sp.
 INSnfrTBNRAAPEI-13	Dasymutilla gloriosa
@@ -309,10 +362,10 @@ INSnfrTBARAAPEI-15	Ceratophyllus gallinae
 INSnfrTBCRAAPEI-17	Thyatira batis
 INSnfrTBKRAAPEI-9	Grylloblatta bifratrilecta
 INSnfrTBLRAAPEI-11	Okanagana villosa
-INSnfrTBMRAAPEI-12	Cimbex cf. pacifica
+INSnfrTBMRAAPEI-12	Cimbex cf.
 INSnfrTBQRAAPEI-16	Cyphoderris sp.
 INSfrgTBERAAPEI-30	Chyphotes sp.
-INSfrgTALRAAPEI-22	Apachyus chartaceus
+INSfrgTALRAAPEI-22	Apachyus charteceus
 INSfrgTAMRAAPEI-30	Lepismachilis ysignata
 INSfrgTANRAAPEI-31	Geometra papilionaria
 INSfrgTAHRAAPEI-18	Epiophlebia superstes
@@ -330,14 +383,13 @@ INSfrgTAQRAAPEI-34	Heteromurus nitidus
 INSfrgTARRAAPEI-35	Coenagrion puella
 INSfrgTASRAAPEI-36	Empusa pennata
 INSfrgTATRAAPEI-37	Tenthredo koehleri
-INSfrgTAURAAPEI-39	Cyphoderidae sp.
-INSfrgTAVRAAPEI-41	Blaberus atropus
+INSfrgTAVRAAPEI-41	Blaberus atropos
 INSfrgTAWRAAPEI-43	Libellula quadrimaculata
 INSfrgTAYRAAPEI-45	Aphidius colemani
 INSfrgTAZRAAPEI-46	Aposthonia japonica
 INSfrgTBARAAPEI-47	Pyrrhosoma nymphula
-INSfrgTBBRAAPEI-56	Nilaparvata lugens
-INSfrgTBCRAAPEI-57	Tanzaniophasma sp.
+INSfrgTBBRAAPEI-56	Tanzaniophasma sp.
+INSfrgTBCRAAPEI-57	Nilaparvata lugens
 INSfrgTAERABPEI-30	Aphelinus abdominalis
 INSfrgTAXRABPEI-44	Gryllotalpa sp.
 INSfrgTBDRAAPEI-62	Sinella curviseta
@@ -378,7 +430,7 @@ INSjdsTBCRAAPEI-46	Perilampus aeneus
 INSjdsTBERAAPEI-56	Trichocera fuscata
 INSjdsTBFRAAPEI-57	Xenophyes metoponcus
 INSjdsTBGRAAPEI-62	Ctenolepisma longicaudata
-INSjdsTBHRAAPEI-74	Cordulegaster boltoni
+INSjdsTBHRAAPEI-74	Cordulegaster boltonii
 INSjdsTBIRAAPEI-75	Oxybelus bipunctatus
 INSjdsTBJRAAPEI-79	Osmylus fulvicephalus
 INSjdsTBKRAAPEI-84	Cis boleti
@@ -485,3 +537,114 @@ INSytvTCERAAPEI-36	Eurylophella sp.
 INSytvTCFRAAPEI-37	Ectopsocus briggsi
 INSytvTCGRAAPEI-39	Valenzuela badiostigma
 INSytvTCFRAAPEI-43	Inocellia crassicornis
+INSodkTAIRAAPEI-87	Nicoletia phytophila
+INSodkTAKRAAPEI-89	Catara rugosicollis
+INSswpTACRAAPEI-13	Tineola bisselliella
+INSswpTAFRAAPEI-16	Harpactus elegans
+INSswpTAXRAAPEI-17	Systropha curvicornis
+INSswpTAZRAAPEI-19	Sceliphron curvatum
+INSswpTBARAAPEI-20	Notiohilara paramonovi
+INSswpTBBRAAPEI-21	Epeolus variegatus
+INSswpTBDRAAPEI-30	Isodontia mexicana
+INSswpTBERAAPEI-31	Odynerus spinipes
+INSswpTBGRAAPEI-34	Nysson niger
+INSswpTBHRAAPEI-35	Anabarhynchus dentiphallus
+INSswpTBIRAAPEI-36	Meria tripunctata
+INSswpTAIRAAPEI-19	Heteropsilopus ingenuus
+INSswpTAJRAAPEI-20	Eupelmus urozonus
+INSswpTARRAAPEI-11	Ceratina chalybaea
+INSswpTATRAAPEI-13	Psenulus fuscipennis
+INSswpTAVRAAPEI-15	Anthidium manicatum
+INSswpTAWRAAPEI-16	Auplopus albifrons
+INSswpTAYRAAPEI-18	Tetralonia macroglossa
+INSswpTBCRAAPEI-22	Protaphorura fimata
+INSswpTBJRAAPEI-37	Crabro peltarius
+INSswpTBKRAAPEI-39	Pseudogalepsus nigricoxa
+INSswpTBLRAAPEI-41	Coelioxys conoidea
+INSswpTBMRAAPEI-43	Apiocera moerens
+INSswpTBNRAAPEI-44	Bembix rostrata
+INSswpTBPRAAPEI-46	Crossocerus quadrimaculatus
+INSswpTBRRAAPEI-56	Podalonia hirsuta
+INSswpTBURAAPEI-74	Tapeigaster digitata
+INSswpTBVRAAPEI-75	Pergagrapta polita
+INSswpTAARAAPEI-11	Hagiotata hofmanni
+INSswpTABRAAPEI-12	Pompilus cinereus
+INSswpTADRAAPEI-14	Dioxys cincta
+INSswpTAKRAAPEI-21	Tachysphex fulvitarsis
+INSswpTALRAAPEI-22	Acontista multicolor
+INSswpTAORAAPEI-33	Lasioglossum xanthopus
+INSswpTAPRAAPEI-34	Vespula germanica
+INSswpTAQRAAPEI-35	Miomantis binotata
+INSswpTBWRAAPEI-94	Magicicada septendecim
+INSswpTBXRAAPEI-95	Magicicada tredecim
+INSodkTAARAAPEI-47	Blattella germanica
+INSodkTABRAAPEI-56	Diplatyidae gen.
+INSodkTACRAAPEI-57	Galloisiana nipponensis
+INSodkTADRAAPEI-62	Tomocerus cuspidatus
+INSodkTAERAAPEI-74	Dicyrtomina leptothrix
+INSodkTAFRAAPEI-75	Apteroperla tikumana
+INSodkTAGRAAPEI-79	Lepidocampa weberi
+INSodkTAHRAAPEI-84	Pedetontus okajimae
+INSodkTAJRAAPEI-88	Machilontus sp.
+INSodkTALRAAPEI-90	Zygonyx iris
+INSodkTAMRAAPEI-93	Tyriobapta torrida
+INSswpTAERAAPEI-15	Exaireta spinigera
+INSswpTAGRAAPEI-17	Sapygina decemguttata
+INSswpTAHRAAPEI-18	Chelostoma florisomne
+INSswpTAMRAAPEI-30	Hylaeus variegatus
+INSswpTANRAAPEI-31	Orchesella cincta
+INSswpTAURABPEI-14	Aularches miliaris
+INSswpTBORABPEI-45	Danuria thunbergi
+INSswpTBSRABPEI-57	Podura aquatica
+INSswpTBTRABPEI-62	Philanthus triangulum
+INShkeTAARAAPEI-94	Apatania incerta
+INShkeTABRAAPEI-95	Micrasema wataga
+INShkeTACRAAPEI-8	Lepidostoma togatum
+INShkeTADRAAPEI-9	Agapetus hessi
+INShkeTAARAAPEI-79	Chrysis fasciata
+INShkeTABRAAPEI-84	Ptosima flavoguttata
+INShkeTAQRAAPEI-45	Hypochrysa elegans
+INShkeTAURAAPEI-57	Phaeostigma major
+INShkeTAVRAAPEI-62	Calliphora vomitoria
+INShkeTACRAAPEI-87	Saturnia pyri
+INShkeTAFRAAPEI-90	Hydraena nigrita/subimpressa
+INShkeTAIRAAPEI-95	Acrotrichis sp.
+INShkeTBDRAAPEI-74	Serica brunnea
+INShkeTCCRAAPEI-37	Hydrometra aquatica
+INShkeTADRAAPEI-88	Ips typographus
+INShkeTAERAAPEI-89	Ergaula capucina
+INShkeTAGRAAPEI-93	Thesprotia graminis
+INShkeTAHRAAPEI-94	Corydalinae_VZ sp.
+INShkeTAJRAAPEI-35	Mantispidae_VZ sp.
+INShkeTAKRAAPEI-36	Xyela alpigena
+INShkeTALRAAPEI-37	Noterus clavicornis
+INShkeTAMRAAPEI-39	Catajapyx aquilonaris
+INShkeTANRAAPEI-41	Lithobius forficatus
+INShkeTAORAAPEI-43	Byturus ochraceus
+INShkeTAPRAAPEI-44	Speleonectes tulumensis
+INShkeTARRAAPEI-46	Sicus ferrugineus
+INShkeTASRAAPEI-47	Rhamnusium bicolor
+INShkeTATRAAPEI-56	Bicyclus anynana
+INShkeTAWRABPEI-74	Sympherobius elegans
+INShkeTAXRAAPEI-75	Stagmatoptera biocellata
+INShkeTAYRAAPEI-79	Ptilinus pectinicornis
+INShkeTAZRAAPEI-84	Raphidia mediteranea
+INShkeTBARAAPEI-56	Byrrhus pilula
+INShkeTBBRAAPEI-57	Microdon brachycerus
+INShkeTBCRAAPEI-62	Crocothemis erythrea
+INShkeTBERAAPEI-75	Cheddikulama straminea
+INShkeTBFRAAPEI-79	Colias croceus
+INShkeTBGRAAPEI-84	Gyna lurida
+INShkeTBHRAAPEI-87	Chilocorus renipustulatus
+INShkeTBIRAAPEI-88	Acanthops sp.
+INShkeTBJRAAPEI-89	Dryops sp.
+INShkeTBKRAAPEI-90	Elaphrus aureus
+INShkeTBLRAAPEI-93	Trinotoperla montana
+INShkeTBMRAAPEI-94	Diestrammena asynamora
+INShkeTBNRAAPEI-95	Microcara testacea
+INShkeTBQRAAPEI-11	Trachyaretaon brueckneri
+INShkeTBRRAAPEI-12	Hallomenus binotatus
+INShkeTBSRAAPEI-13	Trichogramma evanescens
+INShkeTBURAAPEI-15	Paratemnopteryx couloniana
+INShkeTBVRAAPEI-16	Hydrochus megaphallus
+INShkeTBWRAAPEI-17	Diplectrona sp.
