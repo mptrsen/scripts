@@ -23,10 +23,17 @@ $opt{'outdir'}         //= '.';
 my @queries = @ARGV;
 foreach my $queryfile (@queries) {
 	my $blastofn = File::Spec->catfile($opt{'outdir'}, basename($queryfile . '.blastout'));
-	my @blastcmd = qq($opt{'blast-location'} -db $opt{'db'} -query $queryfile -outfmt 7 -out $blastofn);
+	my @blastcmd = qq($opt{'blast-location'} -db $opt{'db'} -query $queryfile -outfmt '7 sseqid sgi sacc sallseqid sallgi sallacc' -out $blastofn);
 	system(@blastcmd) and die "Fatal: BLAST failed: $!\n";
 	my $ofh = IO::File->new($blastofn, 'r');
 	my @blastresult = <$ofh>;
-	@blastresult = grep /^[^#]/, @blastresult;
 	print @blastresult;
+	@blastresult = grep /^[^#]/, @blastresult;
+	if (scalar @blastresult == 0) {
+		print "No hits obtained for $queryfile\n";
+		next;
+	}
+	my @fields = split /\s+/, $blastresult[0];
+	my $id = $fields[1];
+	my @blastdbcmdcmd = qq( File::Spec->catfile(basename($opt{'blast-location'}), 'blastdbcmd') -db $opt{'db'} );
 }
