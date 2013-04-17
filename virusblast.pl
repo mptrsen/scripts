@@ -14,6 +14,7 @@ my %opt = ();
 GetOptions( \%opt,
 	'db=s',
 	'blast-location=s',
+	'blastdbcmd-location=s',
 	'blast-threads=i',
 	'outdir=s',
 	'verbose|v',
@@ -38,7 +39,7 @@ foreach my $queryfile (@queries) {
 	my @blastcmd = qq( $blastp -num_threads $opt{'blast-threads'} -db $opt{'db'} -query $queryfile -outfmt '7 sseqid sgi sacc sallseqid sallgi sallacc' -out $blastofn);
 
 	print "Executing '@blastcmd'\n" if $verbose;
-	system(@blastcmd) and die "Fatal: $opt{'blast-location'} failed: $!\n";
+	system(@blastcmd) and die "Fatal: $opt{'blast-location'} failed. $!\n";
 
 	my $ofh = IO::File->new($blastofn, 'r');
 	my @blastresult = <$ofh>;
@@ -52,7 +53,7 @@ foreach my $queryfile (@queries) {
 	my $dbofn = File::Spec->catfile($blastofn . '.dbo');
 	my @blastdbcmdcmd = qq( $blastdbcmd -db $opt{'db'} -out $dbofn -entry $id -outfmt '%i is taxid %T: %S (%L)');
 	print "Executing '@blastdbcmdcmd'\n" if $verbose;
-	system(@blastdbcmdcmd) and die "Fatal: blastdbcmd failed: $!\n";
+	system(@blastdbcmdcmd) and die "Fatal: blastdbcmd failed. $!\n";
 
 }
 
