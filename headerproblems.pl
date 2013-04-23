@@ -54,6 +54,7 @@ while (<$fh>) {
 	# is a processed hit sequence header a substring of multiple sequence headers?
 	if ( /processing hit: (.*)_RF\d/ ) {
 		$hitseq = $1;
+		# we had this before
 		next if $seen{$hitseq};
 		++$seen{$hitseq};
 		print "processing hit sequence '$hitseq'... " if $verbose;
