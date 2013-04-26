@@ -1,19 +1,21 @@
 #!/usr/bin/perl
 use strict;
 use warnings;
-
 use autodie;
 
 use IO::File;
 use IO::Dir;
+use List::Util qw(first);
 use File::Spec;
 use File::Basename;
 use File::Temp;
 use Getopt::Long;
 use Data::Dumper;
 
+my $dir = undef;
 my $exonerate = 'exonerate';
 my $tcfile = '';
+my $taxon = '';
 my $geneid = '';
 my $genecnt = 0;
 my $hitid = '';
@@ -25,47 +27,68 @@ my $warncnt = 0;
 my $ok = 0;
 my $okcnt = 0;
 my $totalcnt = 0;
+my $shf = undef;
 
 GetOptions( 
 	'v|verbose'   => \$verbose,
 	'exonerate=s' => \$exonerate,
+	'shfile=s'    => \$shf,
+	'datadir=s'   => \$dir,
 );
 
-my $logf = shift @ARGV;
-my $dir = shift @ARGV;
+unless (defined $shf and defined $dir) {
+	print "Usage: $0 -shfile SHFILE -datadir DIRECTORY\n";
+	exit;
+}
 
-# find the sequence file from the log
-printf "%-18s %s\n", 'log file:', $logf;
-my $fh = IO::File->new($logf);
+
+# find everything from the sh file
+printf "%-18s %s\n", 'sh file:', $shf;
+my $fh = IO::File->new($shf);
 while (<$fh>) {
-	if (/Using EST file (.*)$/) {
+	if ( /sequence_file=(.+) -est -taxon=(\w+) / ) {
+		printf "%-18s %s\n", 'taxon name:', $2;
 		printf "%-18s %s\n", 'original file:', $1;
 		$tcfile = File::Spec->catfile($1 . '.mod.tc');
-		printf "%-18s %s\n", 'translated file:', $tcfile;
 		last;
 	}
 }
 undef $fh;
 
-# read the sequences into memory
-print "Reading $tcfile into memory...\n";
-my $sequence_of = slurp_fasta($tcfile);
-printf "%-18s %d\n", 'sequences:', scalar keys %$sequence_of;
+# some tc files do not exist
+if (-e $tcfile) {
+	printf "%-18s %s\n", 'translated file:', $tcfile;
+}
+else {
+	die "Fatal: translated file $tcfile not found\n";
+}
+
+# get output dir from the tc file name
+my $output_dir = get_dir($tcfile);
+die "Fatal: output directory not found\n" unless defined $output_dir;
+printf "%-18s %s\n", 'output directory:', $output_dir;
 
 # get list of files to process
-my $aadir = File::Spec->catdir($dir, 'aa');
-my $dirh = IO::Dir->new($aadir);
-die "Fatal: could not open dir $dir\: $!\n" unless defined $dirh;
+my $aadir = File::Spec->catdir($output_dir, 'aa');
+my $aadirh = IO::Dir->new($aadir);
+die "Fatal: could not open dir $aadir\: $!\n" unless defined $aadirh;
 my @files = ();
-while (my $f = $dirh->read) {
+while (my $f = $aadirh->read) {
 	next if $f =~ /^\./;
 	push @files, File::Spec->catfile($aadir, $f);
 }
-
+undef $aadirh;
 printf "%-18s %d\n", 'output files:', scalar @files;
 
+# read the sequences into memory
+print "Reading translated sequences into memory...\n";
+my $sequence_of = slurp_fasta($tcfile);
+printf "%-18s %d\n", 'sequences:', scalar keys %$sequence_of;
+print "\n";
+
+# check each output file
 foreach my $outputfile (@files) {
-	printf "for output file %s\n", basename $outputfile;
+	printf "output file %s\n", basename $outputfile;
 	$output_sequence_of = slurp_fasta($outputfile);
 	$ok = 0;
 
@@ -94,26 +117,28 @@ foreach my $outputfile (@files) {
 		# problem?
 		else {
 			print "!!  output sequence with header $id is not (sub)sequence with header $id in .tc file\n";
-			print "!!  problems pending\n";
 			$ok = 0;
-			print "!!  going into deep search mode\n";
+			print "!!    problems pending. going into deep search mode\n";
 			my $real_header = deepsearch($id);
 			# identical sequence under different header
 			if ($real_header) {
-				print "!!    found sequence with header $id as $real_header\n";
+				print "!!      found sequence with header $id as $real_header\n";
 			}
 			else {
-				print "!!    did not find sequence with header $id as (sub)sequence anywhere in .tc file\n";
-				print "!!    possible frameshift. running exonerate alignment...\n";
-				my $actual_header = alignment($id);
+				print "!!      did not find sequence with header $id as (sub)sequence anywhere in .tc file\n";
+				print "!!      possible frameshift. running exonerate alignment...\n";
+				my $actual_header = get_best_alignment($id);
 				if ($actual_header) {
 					if ($actual_header eq $id) {
-						print "!!    alignment found, sequence is ok: $id -> $actual_header\n";
+						print "!!      alignment found, sequence is ok: $id -> $actual_header\n";
 						$ok = 1;
 					}
 					else {
-						print "!!    alignment found, sequence is not ok: $id -> $actual_header\n";
+						print "!!      alignment found, sequence is not ok: $id -> $actual_header\n";
 					}
+				}
+				else {
+					print "!!      no alignment found for $id! something is wrong here!\n";
 				}
 			}
 		}
@@ -122,8 +147,9 @@ foreach my $outputfile (@files) {
 	# everything ok?
 	if ($ok) {
 		$okcnt++;
-		print "    everything OK\n";
+		printf "everything OK for %s\n", basename($outputfile);
 	}
+	print "\n";
 	$genecnt++;
 }
 
@@ -131,7 +157,30 @@ printf "checked %d genes\n%d ok\n%d warnings\n", $genecnt,  $okcnt, $genecnt - $
 
 exit;
 
+# get the output dir that belongs to this file
+# call: get_dir($filename)
+# returns: scalar string filename
+sub get_dir {
+	my $tcfile = shift @_;
+	my @dirs = ();
+	# everything after and including the first dot will be removed to form the dirname
+	(my $dirname = $tcfile) =~ s/\..*//;
+	my $dirh = IO::Dir->new($dir);
+	if (defined $dirh) {
+		while (defined($_ = $dirh->read)) {
+			# skip everything that starts with a dot or isn't a dir
+			next if /^\./;
+			next unless -d;
+			if ( /^$dirname/ ) {
+				return $_;
+			}
+		}
+	}
+	return undef;
+}
 
+# get the actual id from a hamstr output header
+# i.e. the last part of the header
 sub get_id {
 	my $longid = shift @_;
 	(my $shortid = $longid) =~ s/.*\|([a-zA-Z0-9._-]+)/$1/;
@@ -142,15 +191,17 @@ sub get_id {
 # sub: slurp_fasta
 # reads the content of a Fasta file into a hashref
 sub slurp_fasta {
-	my $tcfileile = shift @_;
+	my $tcfile = shift @_;
 	my $data = { };
-	my $tcfileh = Seqload::Fasta->open($tcfileile);
+	my $tcfileh = Seqload::Fasta->open($tcfile);
+	die "Fatal: could not open $tcfile\n" unless defined $tcfileh;
 	while (my ($h, $s) = $tcfileh->next_seq()) {
 		$data->{$h} = $s;
 	}
 	return $data;
 }
 
+# find a sequence in all possible reading frames
 sub find_sequence {
 	my $header = shift @_;
 	my $actual_hdr = '';
@@ -179,6 +230,9 @@ sub deepsearch {
 	return undef;
 }
 
+# undo concatenation
+# call: unconcatenate($header)
+# returns: hashref
 sub unconcatenate {
 	my $concatenated_header = shift @_;
 	# split this concatenated sequence into its parts
@@ -206,6 +260,8 @@ sub unconcatenate {
 	return $concatenated_sequence_of;
 }
 
+# single out the relevant sequence
+# returns: hashref
 sub single {
 	my $data = shift @_;
 	my @relevant_keys = grep { /.*\|.*\|.*\|./ } keys %$data;
@@ -214,25 +270,43 @@ sub single {
 	return $data;
 }
 
-sub alignment {
+# get the best alignment for a sequence
+# arguments: scalar string (sequence id)
+# returns: scalar string (sequence id of best match)
+sub get_best_alignment {
 	my $query = shift @_;
-	my $ryo = '%ti\n';
-	my $tmpfh = File::Temp->new( 'UNLINK' => 0 );
+	my $ryo = '%s %ti\n';
+	my $tmpfh = File::Temp->new( 'UNLINK' => 1 );
 	printf $tmpfh ">$query\n$output_sequence_of->{$query}\n";
 	close $tmpfh;
 	my @exoneratecmd = qq( $exonerate --ryo "$ryo" --verbose 0 --showalignment no --showvulgar no --query $tmpfh --target $tcfile 2> /dev/null );
 	my $result = [ `@exoneratecmd` ];
-	my $besthit = shift @$result;
-	if ($besthit) {
-		$besthit =~ s/_RF\d\.\d$//;
-		chomp $besthit;
-		return $besthit;
+
+	# no result
+	unless (@$result) { return undef }
+
+	# result
+	my $hit_with_score = {};
+	foreach (@$result) {
+		chomp;
+		my ($score, $hit) = split;
+		$hit_with_score->{$score} = $hit;
 	}
-	else {
-		return undef;
-	}
+
+	# sort by score, return the best one
+	my @sorted_scores = sort { $b <=> $a } keys %$hit_with_score;
+	my $bestscore = shift @sorted_scores;
+	$hit_with_score->{$bestscore} =~ s/_RF\d\.\d$//;
+	return $hit_with_score->{$bestscore};
 }
 
+
+####################
+# 
+# Seqload::Fasta package
+# for simple and error-free loading of fasta sequence data
+# 
+####################
 
 package Seqload::Fasta;
 use strict;
