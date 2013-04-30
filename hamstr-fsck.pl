@@ -10,7 +10,6 @@ use File::Spec;
 use File::Basename;
 use File::Temp;
 use Getopt::Long;
-use Data::Dumper;
 
 my $dir = undef;
 my $exonerate = 'exonerate';
@@ -60,7 +59,7 @@ if (-e $tcfile) {
 	printf "%-18s %s\n", 'translated file:', $tcfile;
 }
 else {
-	die "Fatal: translated file $tcfile not found\n";
+	die "Fatal: translated file not found: $tcfile\n";
 }
 
 # get output dir from the tc file name
@@ -70,14 +69,7 @@ printf "%-18s %s\n", 'output directory:', $output_dir;
 
 # get list of files to process
 my $aadir = File::Spec->catdir($output_dir, 'aa');
-my $aadirh = IO::Dir->new($aadir);
-die "Fatal: could not open dir $aadir\: $!\n" unless defined $aadirh;
-my @files = ();
-while (my $f = $aadirh->read) {
-	next if $f =~ /^\./;
-	push @files, File::Spec->catfile($aadir, $f);
-}
-undef $aadirh;
+my @files = get_files($aadir);
 printf "%-18s %d\n", 'output files:', scalar @files;
 
 # read the sequences into memory
@@ -99,7 +91,6 @@ foreach my $outputfile (@files) {
 
 	# was the relevant output sequence concatenated?
 	my @concat = grep { /\dPP/ } keys %$output_sequence_of;
-	# this is undef if no concatenated header, so no problem with the if
 	my $concatenated_header = shift @concat;
 	if ( $concatenated_header ) {
 		# un-concatenate (split the concatenated stuff up)
@@ -108,35 +99,47 @@ foreach my $outputfile (@files) {
 		delete $output_sequence_of->{$concatenated_header};
 	}
 	print "  output (sub)sequences: ", join " ", keys %$output_sequence_of, "\n";
+
 	foreach my $id (keys %$output_sequence_of) {
+
 		# nominal case
 		if (find_sequence($id)) {
 			print "    found $id in .tc file\n";
 			$ok = 1;
 		}
+
 		# problem?
 		else {
-			print "!!  output sequence with header $id is not (sub)sequence with header $id in .tc file\n";
+			# uh-oh
 			$ok = 0;
+			print "!!  output sequence with header $id is not (sub)sequence with header $id in .tc file\n";
 			print "!!    problems pending. going into deep search mode\n";
 			my $real_header = deepsearch($id);
+
 			# identical sequence under different header
+			# this is a real problem
 			if ($real_header) {
 				print "!!      found sequence with header $id as $real_header\n";
 			}
+
+			# phew, things might turn out ok
+			# let's see if a slightly different sequence can be found
 			else {
 				print "!!      did not find sequence with header $id as (sub)sequence anywhere in .tc file\n";
 				print "!!      possible frameshift. running exonerate alignment...\n";
 				my $actual_header = get_best_alignment($id);
 				if ($actual_header) {
+					# that's ok
 					if ($actual_header eq $id) {
 						print "!!      alignment found, sequence is ok: $id -> $actual_header\n";
 						$ok = 1;
 					}
+					# hm, not ok :(
 					else {
 						print "!!      alignment found, sequence is not ok: $id -> $actual_header\n";
 					}
 				}
+				# you may panic at this point
 				else {
 					print "!!      no alignment found for $id! something is wrong here!\n";
 				}
@@ -149,11 +152,12 @@ foreach my $outputfile (@files) {
 		$okcnt++;
 		printf "everything OK for %s\n", basename($outputfile);
 	}
+	# karen wanted this linebreak
 	print "\n";
 	$genecnt++;
 }
 
-printf "checked %d genes\n%d ok\n%d warnings\n", $genecnt,  $okcnt, $genecnt - $okcnt;
+printf "%d genes checked\n%d ok\n%d warnings\n", $genecnt,  $okcnt, $genecnt - $okcnt;
 
 exit;
 
@@ -177,6 +181,25 @@ sub get_dir {
 		}
 	}
 	return undef;
+}
+
+# get a list of files in the the dir
+# call: get_files($dirname)
+# returns: list of scalar string filenames
+sub get_files {
+	my $dirn = shift @_;
+	my $aadirh = IO::Dir->new($dirn);
+	die "Fatal: could not open dir $dirn\: $!\n" unless defined $aadirh;
+	my @files = ();
+	while (my $f = $aadirh->read) {
+		# skip stuff starting with a dot
+		next if $f =~ /^\./;
+		if (-e File::Spec->catfile($dirn, $f)) {
+			push @files, File::Spec->catfile($dirn, $f);
+		}
+	}
+	undef $aadirh;
+	return @files;
 }
 
 # get the actual id from a hamstr output header
@@ -208,8 +231,8 @@ sub find_sequence {
 	for my $i (1..6) {
 		$actual_hdr = $header . "_RF$i.0";
 		print "checking for $header in $actual_hdr\n" if $verbose;;
-		# check if sequence is subsequence?
-		if ( $sequence_of->{$actual_hdr} =~ /$output_sequence_of->{$header}/ ) {
+		# check if sequence is subsequence
+		if ( $sequence_of->{$actual_hdr} =~ /\Q$output_sequence_of->{$header}\E/ ) {
 			print "found $header in $actual_hdr\n" if $verbose;;
 			return $actual_hdr;
 		}
@@ -221,11 +244,10 @@ sub find_sequence {
 sub deepsearch {
 	my $header = shift @_;
 	while (my ($real_header, $real_sequence) = each %$sequence_of) {
-		#printf "comparing %s:\n%s\nand %s:\n%s\n", $header, $output_sequence_of->{$header}, $real_header, $sequence_of->{$real_header};
-		if ( $real_sequence =~ /$output_sequence_of->{$header}/ ) {
+		# check if sequence is subsequence
+		if ( $real_sequence =~ /\Q$output_sequence_of->{$header}\E/ ) {
 			return $real_header;
 		}
-		#print "no luck!\n\n";
 	}
 	return undef;
 }
@@ -235,22 +257,26 @@ sub deepsearch {
 # returns: hashref
 sub unconcatenate {
 	my $concatenated_header = shift @_;
+
 	# split this concatenated sequence into its parts
 	my $substr_start = 0;
 	my $substr_len = 0;
 	my $concatenated_sequence_of = {};
+
 	while ( $concatenated_header =~ m/([a-zA-Z0-9_]+)-(\d+)PP/gc ) {
 		if (defined $2) { $substr_len = $2 }
 		else { $substr_len = -0 }
 		$concatenated_sequence_of->{$1} = substr $output_sequence_of->{$concatenated_header}, $substr_start, $substr_len;
 		$substr_start += $2;
 	}
+
 	# add the last sequence
 	# \G matches where last m//g left off
 	if ( $concatenated_header =~ m/\G(.*)$/g ) {
 		$substr_len = 999999;
 		$concatenated_sequence_of->{$1} = substr $output_sequence_of->{$concatenated_header}, $substr_start, $substr_len;
 	}
+
 	if ($verbose) {
 		print "concatenated subseqs:\n";
 		printf ">%s\n%s\n", $_, $concatenated_sequence_of->{$_} foreach keys %$concatenated_sequence_of;
@@ -275,17 +301,25 @@ sub single {
 # returns: scalar string (sequence id of best match)
 sub get_best_alignment {
 	my $query = shift @_;
+
+	# this deserves some explanation.
+	# exonerate supports rolling your own output format (ryo) printf-style:
+	# %s is the alignment score
+	# %ti is the target identifier
 	my $ryo = '%s %ti\n';
+
+	# write sequences to temporary file
 	my $tmpfh = File::Temp->new( 'UNLINK' => 1 );
-	printf $tmpfh ">$query\n$output_sequence_of->{$query}\n";
+	printf $tmpfh ">%s\n%s\n", $query, $output_sequence_of->{$query};
 	close $tmpfh;
+	# do exonerate alignment search
 	my @exoneratecmd = qq( $exonerate --ryo "$ryo" --verbose 0 --showalignment no --showvulgar no --query $tmpfh --target $tcfile 2> /dev/null );
 	my $result = [ `@exoneratecmd` ];
 
 	# no result
 	unless (@$result) { return undef }
 
-	# result
+	# parse result
 	my $hit_with_score = {};
 	foreach (@$result) {
 		chomp;
