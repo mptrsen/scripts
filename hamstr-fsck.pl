@@ -194,7 +194,7 @@ sub get_files {
 	while (my $f = $aadirh->read) {
 		# skip stuff starting with a dot
 		next if $f =~ /^\./;
-		if (-e File::Spec->catfile($dirn, $f)) {
+		if (-f File::Spec->catfile($dirn, $f)) {
 			push @files, File::Spec->catfile($dirn, $f);
 		}
 	}
@@ -263,7 +263,7 @@ sub unconcatenate {
 	my $substr_len = 0;
 	my $concatenated_sequence_of = {};
 
-	while ( $concatenated_header =~ m/([a-zA-Z0-9_]+)-(\d+)PP/gc ) {
+	while ( $concatenated_header =~ m/([a-zA-Z0-9_-]+)-(\d+)PP/gc ) {
 		if (defined $2) { $substr_len = $2 }
 		else { $substr_len = -0 }
 		$concatenated_sequence_of->{$1} = substr $output_sequence_of->{$concatenated_header}, $substr_start, $substr_len;

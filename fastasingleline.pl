@@ -13,5 +13,5 @@ foreach (@ARGV) {
 	while (my ($h, $s) = $fh->next_seq()) {
 		printf(">%s\n%s\n", $h, $s);
 	}
-	$fh->close();
+	undef $fh;
 }
