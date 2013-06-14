@@ -111,7 +111,7 @@ sub do_blastp_search {
 
 	return $blastofn if -s $blastofn;
 
-	my @blastcmd = qq( $blastp -num_threads $opt{'blast-threads'} -db $opt{'db'} -query $qf -outfmt '7 sseqid sgi sacc sallseqid sallgi sallacc' -out $blastofn );
+	my @blastcmd = qq( $blastp -num_threads $opt{'blast-threads'} -db $opt{'db'} -query $qf -outfmt '7 qseqid sgi' -out $blastofn );
 
 	print "Executing '@blastcmd'\n" if $verbose;
 	system(@blastcmd) and die "Fatal: $opt{'blast-location'} failed. $!\n";
