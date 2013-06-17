@@ -21,21 +21,26 @@ GetOptions( \%opt,
 	'division=s',
 	'names=s',
 	'outdir=s',
+	'remote',
 	'verbose|v',
 );
 
+# paths hardcoded to the ZFMK cluster unless specified
 $opt{'db'}             //= '/share/pool/nr/2013-03-01/nr';
 $opt{'blast-location'} //= '/share/apps/blastp_2.2.26+';
 $opt{'blastdbcmd-location'} //= '/share/apps/blastdbcmd_2.2.26+';
 $opt{'blast-threads'}  //= 1;
-$opt{'outdir'}         //= '.';
+$opt{'division'}       //= '/share/pool/tax/2013-06-13/division.dmp';
 $opt{'nodes'}          //= '/share/pool/tax/2013-06-13/nodes.dmp';
 $opt{'names'}          //= '/share/pool/tax/2013-06-13/nodes.dmp';
-$opt{'division'}       //= '/share/pool/tax/2013-06-13/division.dmp';
+$opt{'outdir'}         //= '.';
+$opt{'remote'}         //= undef;
 my @queries = @ARGV;
 
+# variables for easier access
 my $blastp = File::Spec->catfile($opt{'blast-location'});
 my $blastdbcmd = File::Spec->catfile($opt{'blastdbcmd-location'});
+my $remote = $opt{'remote'};
 my $verbose = $opt{'verbose'};
 my $n = 0;
 my $isvir = '';
@@ -85,13 +90,22 @@ foreach my $queryfile (@queries) {
 		or print "No BLASTP hits obtained for $queryfile\n" and next;
 
 	$n = 0;
-	foreach my $gid (@$blastresult) {
+	foreach my $result (@$blastresult) {
 		$n++;
 
-		my $tax_id = get_taxon_id($gid);
+		my $tax_id = get_taxon_id($result->[1]);
 		my $div_id = $division_of_node->{$tax_id};
+		my $taxon_name = $taxon_name_of->($tax_id);
 		if ($div_id == 9) { $isvir = 'X' } else { $isvir = ' ' }
-		printf "%-5s %-10s %-6s %-3s\n", $isvir, $gid, $tax_id, $div_id;
+		printf "%-5s %-10s %-6s %-3s %d %f %s\n",
+			$isvir,        # is this a virus sequence?
+			$result->[0],  # the sequence id
+			$tax_id,       # taxon id
+			$div_id,       # division id
+			$result->[2],  # bit score
+			$result->[3],  # e-value
+			$taxon_name,   # taxon name
+		;
 
 	}
 }
@@ -109,9 +123,15 @@ sub do_blastp_search {
 	my $blastofn = File::Spec->catfile($opt{'outdir'}, basename($qf . '.blastout'));
 	print "Using BLASTP output file $blastofn\n" if $verbose;
 
+	# set database to 'nr' if using remote option
+	my $db = $remote ? 'nr' : $opt{'db'};
+
+	# number of threads only if running a local search
+	my $threads = $remote ? "-num_threads $opt{'blast-threads'}" : '';
+
 	return $blastofn if -s $blastofn;
 
-	my @blastcmd = qq( $blastp -num_threads $opt{'blast-threads'} -db $opt{'db'} -query $qf -outfmt '7 qseqid sgi' -out $blastofn );
+	my @blastcmd = qq( $blastp $threads -db $db -query $qf -outfmt '7 qseqid sgi bitscore evalue' -out $blastofn );
 
 	print "Executing '@blastcmd'\n" if $verbose;
 	system(@blastcmd) and die "Fatal: $opt{'blast-location'} failed. $!\n";
@@ -126,15 +146,15 @@ sub parse_blast_resultfile {
 	undef $ofh;
 	@blastresult = grep /^[^#]/, @blastresult;
 	chomp @blastresult;
-	my @gids = ();
+	my @results = ();
 	if (scalar @blastresult > 0) {
 		foreach my $line (@blastresult) {
 			my @fields = split /\s+/, $line;
-			push @gids, $fields[1];
+			push @results, \@fields;
 		}
 	}
 	else { return undef }
-	scalar @blastresult > 0 ? return \@gids : return undef;
+	scalar @blastresult > 0 ? return \@results : return undef;
 }
 
 sub get_taxon_id {
