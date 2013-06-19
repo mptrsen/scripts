@@ -18,6 +18,7 @@ GetOptions( \%opt,
 	'blast-location=s',
 	'blastdbcmd-location=s',
 	'blast-threads=i',
+	'delnodes=s',
 	'division=s',
 	'names=s',
 	'outdir=s',
@@ -32,7 +33,8 @@ $opt{'blastdbcmd-location'} //= '/share/apps/blastdbcmd_2.2.26+';
 $opt{'blast-threads'}  //= 1;
 $opt{'division'}       //= '/share/pool/tax/2013-06-13/division.dmp';
 $opt{'nodes'}          //= '/share/pool/tax/2013-06-13/nodes.dmp';
-$opt{'names'}          //= '/share/pool/tax/2013-06-13/nodes.dmp';
+$opt{'names'}          //= '/share/pool/tax/2013-06-13/names.dmp';
+$opt{'delnodes'}       //= '/share/pool/tax/2013-06-13/delnodes.dmp';
 $opt{'outdir'}         //= '.';
 $opt{'remote'}         //= undef;
 my @queries = @ARGV;
@@ -45,6 +47,7 @@ my $verbose = $opt{'verbose'};
 my $n = 0;
 my $isvir = '';
 
+# test whether files exist and stuff
 unless (-f File::Spec->catfile($opt{'db'} . '.pal')) {
 	die "Fatal: BLAST database not found at '" . $opt{'db'} . "'\n";
 }
@@ -79,31 +82,60 @@ print "## blastdbcmd at $opt{'blastdbcmd-location'}\n";
 my $division_of_node = nodes2division($opt{'nodes'}) or die;
 my $division_name_of = divisions($opt{'division'}) or die;
 my $taxon_name_of    = names($opt{'names'}) or die;
+my $deleted_node     = delnodes($opt{'delnodes'}) or die;
 
 foreach my $queryfile (@queries) {
 	print "# $queryfile\n";
-	printf "# %-3s %-10s %-6s %-3s\n", 'vir', 'gid', 'taxid', 'div';
 
 	my $blast_output_file = do_blastp_search($queryfile);
 
 	my $blastresult = parse_blast_resultfile($blast_output_file)
 		or print "No BLASTP hits obtained for $queryfile\n" and next;
 
+	printf "# %-3s %-10s %-10s %-6s %-3s %-6s %-8s %s\n",
+		'vir',
+		'qsid',
+		'tgid',
+		'taxid',
+		'div',
+		'score',
+		'evalue',
+		'pident',
+		'qstart',
+		'qend',
+		'sstart',
+		'send',
+		'taxon',
+	;
+
 	$n = 0;
 	foreach my $result (@$blastresult) {
 		$n++;
 
-		my $tax_id = get_taxon_id($result->[1]);
+		# skip deleted nodes
+		if ($deleted_node->{$result->[1]}) { next }
+
+		# get information: taxon id, division, taxon name
+		my $tax_id = get_taxon_id($result->[1], $n);
 		my $div_id = $division_of_node->{$tax_id};
-		my $taxon_name = $taxon_name_of->($tax_id);
-		if ($div_id == 9) { $isvir = 'X' } else { $isvir = ' ' }
-		printf "%-5s %-10s %-6s %-3s %d %f %s\n",
+		my $taxon_name = $taxon_name_of->{$tax_id};
+
+		# is this a virus hit?
+		if ( $div_id == 9 or $taxon_name =~ /virus/i ) { $isvir = 'X' } else { $isvir = '' }
+
+		printf "%-5s %-10s %-10s %-7s %-2d %6.1f %8.1e %.1f %d %d %d %d %s\n",
 			$isvir,        # is this a virus sequence?
-			$result->[0],  # the sequence id
+			$result->[0],  # query id
+			$result->[1],  # target id
 			$tax_id,       # taxon id
 			$div_id,       # division id
 			$result->[2],  # bit score
 			$result->[3],  # e-value
+			$result->[4],  # percent identity
+			$result->[5],  # query start
+			$result->[6],  # query end
+			$result->[7],  # target start
+			$result->[8],  # target end
 			$taxon_name,   # taxon name
 		;
 
@@ -131,7 +163,10 @@ sub do_blastp_search {
 
 	return $blastofn if -s $blastofn;
 
-	my @blastcmd = qq( $blastp $threads -db $db -query $qf -outfmt '7 qseqid sgi bitscore evalue' -out $blastofn );
+	# output format
+	my $outfmt = '7 qseqid sgi bitscore evalue pident qstart qend sstart send';
+
+	my @blastcmd = qq( $blastp $threads -db $db -query $qf -outfmt '$outfmt' -out $blastofn );
 
 	print "Executing '@blastcmd'\n" if $verbose;
 	system(@blastcmd) and die "Fatal: $opt{'blast-location'} failed. $!\n";
@@ -159,9 +194,10 @@ sub parse_blast_resultfile {
 
 sub get_taxon_id {
 	my $id = shift @_;
+	my $n = shift @_;
 	# replace every nonstandard character in order to form an ok filename
 	(my $fn = $id) =~ s/[^a-zA-Z0-9_.\-+]/_/g;
-	my $dbofn = File::Spec->catfile($opt{'outdir'}, $fn . '.dbo'. $n);
+	my $dbofn = File::Spec->catfile($opt{'outdir'}, $fn . '.dbo.'. $n);
 
 	# output format: sequence_id tax_id
 	# the tax_id can be found in the taxonomy dumpfiles
@@ -181,7 +217,7 @@ sub get_taxon_id {
 sub nodes2division {
 	my $nfn = shift @_;
 	my $division_of_node = { };
-	print "##  Loading nodes into memory...\n";
+	print "## Loading nodes into memory...\n";
 	open my $nfh, '<', $nfn;
 	#my $nfh = IO::File->new($nfn, 'r');
 	while (<$nfh>) {
@@ -189,7 +225,7 @@ sub nodes2division {
 		my @fields = split /\s+\|\s+/;
 		$division_of_node->{$fields[0]} = $fields[4];
 	}
-	return $division_of_node;
+	$division_of_node ? return $division_of_node : return undef;
 }
 
 sub divisions { 
@@ -203,7 +239,7 @@ sub divisions {
 		my @fields = split /\s+\|\s+/;
 		$division_name->{$fields[0]} = $fields[2];
 	}
-	return $division_name;
+	$division_name ? return $division_name : return undef;
 }
 
 sub names {
@@ -216,5 +252,16 @@ sub names {
 		my @fields = split /\s+\|\s+/;
 		$name_of->{$fields[0]} = $fields[1];
 	}
-	return $name_of;
+	$name_of ? return $name_of : return undef;
+}
+
+sub delnodes {
+	my $fn = shift @_;
+	my $deleted_nodes = { };
+	print "## Loading deleted nodes into memory...\n";
+	open my $fh, '<', $fn;
+	my @deleted_nodes = <$fh>;
+	chomp @deleted_nodes;
+	$deleted_nodes = { map { $_ => 1 } @deleted_nodes };
+	$deleted_nodes ? return $deleted_nodes : return undef;
 }

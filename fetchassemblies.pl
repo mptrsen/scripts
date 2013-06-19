@@ -4,6 +4,7 @@ use warnings;
 use autodie;
 
 use IO::File;
+use List::Util qw(first);
 
 scalar @ARGV > 1 or die "Usage: $0 REPORTFILE ASSEMBLYFILE ASSEMBLYFILE ASSEMBLYFILE [...]\n";
 
@@ -15,30 +16,40 @@ my @assemblies = @ARGV;
 
 my $fh = IO::File->new($reportfile, 'r');
 
-my $nfh;
-my $assembly = '';
-my @assemblyfile = ();
-my $assemblycontent;
-my $hdr;
+my $nfh             = undef;
+my $assembly        = '';
+my $assemblyfile    = undef;
+my $assemblycontent = undef;;
+my $hdr             = undef;
 
 while (<$fh>) {
+
 	if ( /Assembly: \b([a-zA-Z0-9-]+)\b \[(..)\]/ ) {
 		$assembly = $1 . '_' . $2;
 		print "Assembly: $assembly\n";
-		@assemblyfile = grep /\Q$assembly\E/, @assemblies;	
+		$assemblyfile = first { /\Q$assembly\E/ } @assemblies;	
+		die "Fatal: assembly file for $assembly not in argument list\n" unless $assemblyfile;
 		undef $assemblycontent;
 		undef $nfh;
 		$nfh = IO::File->new($assembly . '.fas', 'w');
-		$assemblycontent = slurpfasta($assemblyfile[0]);
-
+		$assemblycontent = slurpfasta($assemblyfile);
 	}
+
+	# this part modifies the pseudo-fasta header so that it matches the actual
+	# header in the original nucleotide assembly. 
 	if ( /^>/ ) {
 		s/^>//;
-		s/:.+$//;
+		s/(:| )?\[(revcomp|translate).+$//;
 		s/\s*$//;
-		print "Sequence '$_'\n";
-		printf $nfh ">%s\n%s\n", $_, $$assemblycontent{$_};
+		if ($$assemblycontent{$_}) {
+			print "Sequence '$_'\n";
+			printf $nfh ">%s\n%s\n", $_, $$assemblycontent{$_};
+		}
+		else {
+			warn "!! Warning: Sequence '$_' not found\n";
+		}
 	}
+
 }
 
 # slurp a fasta file
