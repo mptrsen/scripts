@@ -1,6 +1,7 @@
 #!/usr/bin/perl
 use strict;
 use warnings;
+use autodie;
 
 use File::Basename;
 use File::Spec;
@@ -10,6 +11,7 @@ use Getopt::Long;
 
 my $outdir            = undef;
 my $reportfile        = undef;
+my $specieslistfile   = undef;
 my $hmmsearch         = '/share/scientific_bin/hmmer-3.0/hmmsearch';
 my $evalue_threshold  = '10e-5';
 my $max               = 0;
@@ -17,16 +19,17 @@ my $ncpu              = 1;
 my $data              = {};
 my $help;
 my %species           = ();
-my $usage             = "Usage: $0 [OPTIONS]... HMMFILE ASSEMBLYFILES\n";
+my $usage             = "Usage: $0 [OPTIONS]... HMMFILE ASSEMBLYFILES\nRefer to `perldoc $0` for more information\n";
 
 GetOptions(
-	'outdir=s'     => \$outdir,
-	'reportfile=s' => \$reportfile,
-	'hmmsearch=s'  => \$hmmsearch,
-	'E=f'          => \$evalue_threshold,
-	'max'          => \$max,
-	'ncpu=i'       => \$ncpu,
-	'h|help'       => \$help,
+	'outdir=s'      => \$outdir,
+	'reportfile=s'  => \$reportfile,
+	'specieslist=s' => \$specieslistfile,
+	'hmmsearch=s'   => \$hmmsearch,
+	'E=f'           => \$evalue_threshold,
+	'max'           => \$max,
+	'ncpu=i'        => \$ncpu,
+	'h|help'        => \$help,
 ) or die;
 
 # check input 
@@ -46,10 +49,19 @@ $reportfile //= File::Spec->catfile(basename($hmm, '.hmm') . '.txt');
 $max = $max ? '--max' : '';
 
 # get the assembly->species list
-while (<DATA>) {
-	chomp;
-	my @cols = split("\t");
-	$species{$cols[0]} = $cols[1];
+if ($specieslistfile) {
+	open my $fh, '<', $specieslistfile;
+	while (<$fh>) {
+		chomp;
+		my @cols = split("\t");
+		$species{$cols[0]} = $cols[1];
+	}
+} else {
+	while (<DATA>) {
+		chomp;
+		my @cols = split("\t");
+		$species{$cols[0]} = $cols[1];
+	}
 }
 
 my $reportfh = IO::File->new($reportfile, 'w');
@@ -240,6 +252,20 @@ Specify the output directory.
 =head2 -reportfile REPORTFILE
 
 Specify the report file.
+
+=head2 -specieslist LISTFILE
+
+Specify the species list file. The species list must be in the following format:
+
+  Assembly_ID<TAB>Species name
+
+<TAB> is a tab character (!). For example:
+
+  INSbusTBNRABPEI-121	Andrena vaga
+  INSbusTBGRABPEI-127	Anthophora plumipes
+
+If you do not specify any file, the list is assumed to be at the end of the
+program file, so you need to edit the code in this case.
 
 =cut
 
