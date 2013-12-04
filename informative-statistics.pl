@@ -37,7 +37,7 @@ close $fh;
 # add and output
 printf "%32s%10s%10s% 10s% 10s\n", 'Species', 'Sites', 'iSites', '%iSites', '%missing';
 print '-' x 72, "\n";
-foreach (sort keys %$data) {
+foreach (sort { substr($a, 7, 800) <=> substr($b, 7, 800) } keys %$data) {
 	$total_sites += $data->{$_}->{'len'};
 	$total_isites += $data->{$_}->{'inf'};
 	$perc = ($data->{$_}->{'inf'} / $data->{$_}->{'len'}) * 100;
@@ -47,5 +47,5 @@ foreach (sort keys %$data) {
 # total
 $total_perc = ($total_isites / $total_sites) * 100;
 print '-' x 72, "\n";
-printf "%32s%10d%10d\n", 'Total', $total_sites, $total_isites;
+printf "%32s%10d%10d (%d %s)\n", 'Total', $total_sites, $total_isites, scalar keys %$data, 'sequences';
 printf "%32s%10s%10s% 9.2f% 9.2f\n", 'Average', '', '', $total_perc, 100 - $total_perc;

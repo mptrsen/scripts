@@ -30,19 +30,21 @@ my %seen = ();
 my $nupd = 0;
 my $n = 0;
 
-open my $new_ogs, '>', File::Spec->catfile('/tmp', 'corresp-' . basename($ARGV[0]));
-open my $new_transcripts, '>', File::Spec->catfile('/tmp', 'corresp-' . basename($ARGV[1]));
+my $new_ogs = IO::File->new(File::Spec->catfile('/tmp', 'corresp-' . basename($ARGV[0])), 'w');
+my $new_transcripts = IO::File->new(File::Spec->catfile('/tmp', 'corresp-' . basename($ARGV[1])), 'w');
 
 foreach my $hdr (sort {$a cmp $b} keys %$ogs) {
 	unless (exists $transcripts->{$hdr}) {
 		if ($skipfirst) {
+			print "Not found in transcriptome: $hdr, skipping\n";
 			$skipfirst = 0;
+			next;
 		} else {
 			die "Not found in transcriptome: $hdr\n";
 		}
 	}
-	++$seen{$hdr};
-	die "Non-unique header: $hdr\n" if $seen{$hdr} > 1;
+	
+	die "Non-unique header: $hdr\n" if $seen{$hdr}++;
 	
 	# print to files 
 	my $aafn = fastaify($hdr, $ogs->{$hdr});
@@ -62,7 +64,7 @@ foreach my $hdr (sort {$a cmp $b} keys %$ogs) {
 	# run exonerate
 	my @command = qq( exonerate --bestn 1 --score $score_threshold --ryo '$exonerate_ryo' --model $exonerate_model --querytype protein --targettype dna --verbose 0 --showalignment no --showvulgar no $aafn $ntfn > $outfile );
 
-	system(@command) and die $!;
+	system(@command) and die $?;
 
 	# write new sequences to file
 	my $res = Seqload::Fasta::slurp_fasta($outfile);
@@ -83,7 +85,7 @@ foreach my $hdr (sort {$a cmp $b} keys %$ogs) {
 	++$n;
 }
 
-print "Done, updated $nupd of $n sequences\n";
+print "Done, updated $nupd of $n sequences, written to $new_ogs and $new_transcripts\n";
 
 exit;
 
