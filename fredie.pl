@@ -25,7 +25,7 @@ my $usage = "Usage: $0 -sequence-file FASTAFILE -thesaurus THESAURUSFILE -distfi
 $seqf //= die $usage;
 $thesf //= die $usage;
 $distf //= die $usage;
-$identity_threshold //= 1;
+$identity_threshold //= 95;
 
 my $haplotype_label_format = '%.3s_%.3s_%.3s';
 
@@ -46,6 +46,7 @@ my ($haplotypes, $n_haplotypes) = haplotypify($sequences);
 print_haplotypes($haplotypes);
 print "$n_haplotypes haplotypes\n";
 
+exit;
 my $m = make_matrix($haplotypes, $drainages);
 
 print_matrix($m);
@@ -139,8 +140,9 @@ sub haplotypify {
 			if (grep { $fields[2] eq $_->{'drain'} } @{$d->{$spec}})  {
 				print STDERR "drain identical: $fields[2]\n";
 				print "testing $h against other seqs of this species...\n";
-				if (compare_seqs($s, $d->{$spec}) >= $identity_threshold) {
-					print "total diff: ", compare_seqs($s, $d->{$spec}), "\n";
+				my $total_diff = compare_seqs($s, $d->{$spec});
+				print "total diff: ", $total_diff, "\n";
+				if ($total_diff >= $identity_threshold) {
 					printf STDERR "seq more than %.2f%% identical, not a new haplotype, skipping\n", $identity_threshold ;
 				}
 				# oops, the sequence is different -> new haplotype?
@@ -182,11 +184,63 @@ sub compare_seqs {
 	my $sum_diffs = 0;
 	my $c = 0;
 	foreach my $prevs (@$prevseqs) {
-		$sum_diffs += diff($newseq, $prevs->{'seq'});
+		my $dist = k2pdiff($newseq, $prevs->{'seq'});
+		print $dist, "\n";
+		$sum_diffs += $dist;
 		++$c;
 	}
 	# return average difference
 	return sprintf("%.2f", $sum_diffs/$c*100);
+}
+
+sub k2pdiff {
+	my $seqA = shift;
+	my $seqB = shift;
+	die "Unequal sequence lengths in k2p comparison\n" if length($seqA) != length($seqB);
+	my $s_equal    = 0;
+	my $s_transit  = 0;
+	my $s_transv   = 0;
+	my $s_ambig    = 0;
+	for (my $i = 0; $i < length $seqA; $i++) {
+		my $nucA = substr $seqA, $i, 1;
+		my $nucB = substr $seqB, $i, 1;
+		# equal sites
+		if ($nucA eq $nucB) {
+			++$s_equal;
+		}
+		# transition (A <-> G)
+		elsif (transition($nucA, $nucB)) { 
+			++$s_transit;
+		}
+		# transversion (T <-> C)
+		elsif (transversion($nucA, $nucB)) { 
+			++$s_transv;
+		}
+		# ambiguous site (N or -)
+		elsif ($nucA =~ /[nN-]/ or $nucB =~ /[nN-]/) {
+			$s_ambig++;
+		}
+	}
+	my $p = $s_transit / length $seqA;
+	my $q = $s_transv  / length $seqA;
+	# kimura two-parameter distance
+	return -0.5 * log(1 - 2 * $p - $q) - 0.25 * log(1 - 2 * $q);
+}
+
+sub transversion {
+	my $n1 = shift;
+	my $n2 = shift;
+	if (lc $n1 eq 'c' and lc $n2 eq 't') { return 1 }
+	elsif (lc $n1 eq 't' and lc $n2 eq 'c') { return 1}
+	else { return 0 }
+}
+
+sub transition {
+	my $n1 = shift;
+	my $n2 = shift;
+	if (lc $n1 eq 'a' and lc $n2 eq 'g') { return 1 }
+	elsif (lc $n1 eq 'g' and lc $n2 eq 'a') { return 1}
+	else { return 0 }
 }
 
 sub diff {

@@ -30,8 +30,10 @@ my %seen = ();
 my $nupd = 0;
 my $n = 0;
 
-my $new_ogs = IO::File->new(File::Spec->catfile('/tmp', 'corresp-' . basename($ARGV[0])), 'w');
-my $new_transcripts = IO::File->new(File::Spec->catfile('/tmp', 'corresp-' . basename($ARGV[1])), 'w');
+my $new_ogs_file = File::Spec->catfile('/tmp', 'corresp-' . basename($ARGV[0]));
+my $new_transcripts_file = File::Spec->catfile('/tmp', 'corresp-' . basename($ARGV[1]));
+open my $new_ogs, '>', $new_ogs_file;
+open my $new_transcripts, '>', $new_transcripts_file;
 
 foreach my $hdr (sort {$a cmp $b} keys %$ogs) {
 	unless (exists $transcripts->{$hdr}) {
@@ -85,7 +87,7 @@ foreach my $hdr (sort {$a cmp $b} keys %$ogs) {
 	++$n;
 }
 
-print "Done, updated $nupd of $n sequences, written to $new_ogs and $new_transcripts\n";
+print "Done, updated $nupd of $n sequences, written to $new_ogs_file and $new_transcripts_file\n";
 
 exit;
 
