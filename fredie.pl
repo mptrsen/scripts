@@ -114,10 +114,10 @@ sub print_new_fasta {
 
 sub print_haplotypes {
 	my $ht = shift;
-	print STDERR "Haplotype table:\n-------------------------------------------------\n";
+	print "Haplotype table:\n-------------------------------------------------\n";
 	foreach my $spec (sort keys %$ht) {
 		foreach my $set (sort {$a->{'drain'} cmp $b->{'drain'}} @{$ht->{$spec}}) {
-			printf STDERR "%-25s %-10s %s\n", 
+			printf "%-25s %-10s %s\n", 
 				$spec,
 				$set->{'drain'}, 
 				$set->{'country'}
@@ -135,31 +135,32 @@ sub haplotypify {
 		my @fields = split /_/, $h;
 		my $spec = $fields[0] . '_' . $fields[1];
 		if (exists $d->{$spec}) {
-			print STDERR "species identical: $spec\n";
+			print "species identical: $spec\n";
 			# skip this if drainage and sequence are identical
 			if (grep { $fields[2] eq $_->{'drain'} } @{$d->{$spec}})  {
-				print STDERR "drain identical: $fields[2]\n";
+				print "drain identical: $fields[2]\n";
 				print "testing $h against other seqs of this species...\n";
-				my $total_diff = compare_seqs($s, $d->{$spec});
-				print "total diff: ", $total_diff, "\n";
-				if ($total_diff >= $identity_threshold) {
-					printf STDERR "seq more than %.2f%% identical, not a new haplotype, skipping\n", $identity_threshold ;
+				my $avg_diff = compare_seqs($s, $d->{$spec});
+				printf "avg diff: %f (%.2f%%)\n", $avg_diff, $avg_diff * 100;
+				if (1 - $avg_diff * 100 >= $identity_threshold / 100) {
+					print '1 - $avg_diff * 100 >= $identity_threshold / 100', "\n";
+					printf "seq more than %.2f%% identical, not a new haplotype, skipping\n", $identity_threshold ;
 				}
 				# oops, the sequence is different -> new haplotype?
 				else {
-					print STDERR "!! SEQ DIFFERENT !!\n";
+					print "!! SEQ DIFFERENT !!\n";
 					$add = 1;
 				}
 			}
 			# new drain -> new haplotype
 			else {
-				print STDERR "new drain: $fields[2]\n";
+				print "new drain: $fields[2]\n";
 				$add = 1;
 			}
 		}
 		# new species -> new haplotype
 		else {
-			print STDERR ">>NEW HAPLOTYPE: $spec $fields[2] $fields[3]\n";
+			print ">>NEW HAPLOTYPE: $spec $fields[2] $fields[3]\n";
 			$add = 1;
 		}
 		if ($add) {
@@ -172,7 +173,7 @@ sub haplotypify {
 			};
 			++$n_ht;
 			$add = 0;
-			printf STDERR ">>Added new haplotype: %s, %s, %s\n", $spec, $fields[2], $fields[3];
+			printf ">>Added new haplotype: %s, %s, %s\n", $spec, $fields[2], $fields[3];
 		}
 	}
 	return ($d, $n_ht);
@@ -190,7 +191,7 @@ sub compare_seqs {
 		++$c;
 	}
 	# return average difference
-	return sprintf("%.2f", $sum_diffs/$c*100);
+	return $sum_diffs/$c;
 }
 
 sub k2pdiff {
@@ -221,7 +222,9 @@ sub k2pdiff {
 			$s_ambig++;
 		}
 	}
+	# transition frequency
 	my $p = $s_transit / length $seqA;
+	# transversion frequency
 	my $q = $s_transv  / length $seqA;
 	# kimura two-parameter distance
 	return -0.5 * log(1 - 2 * $p - $q) - 0.25 * log(1 - 2 * $q);
@@ -262,7 +265,7 @@ sub diff {
 			$s_diff++;
 		}
 	}
-	printf STDERR "eq: %d\nambig: %d\ndiff: %d\nperc eq: %.2f\n", $s_equal, $s_ambig, $s_diff, $s_equal/length $seqA;
+	printf "eq: %d\nambig: %d\ndiff: %d\nperc eq: %.2f\n", $s_equal, $s_ambig, $s_diff, $s_equal/length $seqA;
 	return sprintf("%.2f", $s_equal/length($seqA));
 }
 
