@@ -30,4 +30,3 @@ while (<$infh>) {
 		print $outfh "$_\n";
 	}
 }
-print "$nseqs sequences in $outf\n" unless $nseqs == 0;

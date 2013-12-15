@@ -2,12 +2,14 @@
 use strict;
 use warnings;
 
-use Seqload::Fasta qw(fasta2csv); # oo access to fasta files
+use Seqload::Fasta;
 
-foreach my $file (@ARGV) {
-	my $infh = Seqload::Fasta->open($file);
+my @infiles = @ARGV;
+die "No files in argument list\n" if scalar @infiles == 0;
+
+foreach my $infile (@infiles) {
+	my $infh = Seqload::Fasta->open($infile);
 	while (my ($hdr, $seq) = $infh->next_seq()) {
-		printf "%s,%s\n", $hdr, $seq;
+		printf("%s,%s\n", $hdr, $seq);
 	}
-	$infh->close();
 }

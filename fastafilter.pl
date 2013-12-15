@@ -58,7 +58,7 @@ my (
 	$help,
 	$verbose,
 	$listfile,
-	$fastafile,
+	@fastafiles,
 	$outfile,
 	$tracefile,
 	$delcount,
@@ -67,12 +67,16 @@ my (
 );
 
 GetOptions(
-  'l=s' => \$listfile,
-	'f=s' => \$fastafile,
 	't'   => \$tracefile,
   'h'   => \$help,
 	'v'   => \$verbose
 );#}}}
+
+$listfile = shift @ARGV or die "You must supply a file with a list of headers and at least one Fasta file!\n";
+if (scalar @ARGV > 0) {
+	@fastafiles = @ARGV;
+}
+else { die "You must supply a file with a list of headers and at least one Fasta file!\n" }
 
 # help message etc
 if ($help) {#{{{
@@ -88,11 +92,6 @@ EOF
 exit;
 }#}}}
 
-die "Fatal: Mandatory argument -l missing\n" 
-	unless $listfile;
-
-die "Fatal: Mandatory argument -f missing\n"
-	unless $fastafile;#}}}
 
 #--------------------------------------------------
 # # Open all files
@@ -114,7 +113,6 @@ if ($tracefile) {
 	print "using tracefile\t$tracefile\n";
 	open (my $tracefh, '>', File::Spec->catfile($tracefile))
 		or die "Fatal: Could not open tracefile $tracefile $!\n";
-	close $tracefh;
 }
 
 # open the output file
@@ -140,12 +138,12 @@ while (my $line = <$fh>) {
 		if (defined $duplet{'seq'}) {
 			# find the header in the list, flag for deletion
 			for (my $i = 0; $i < scalar @list; ++$i) {
-				if ($duplet {'hdr'} =~ /^$list[$i]/) { 				#KM: original: # if ($duplet{'hdr'} eq $list[$i]) { ### KM	if ($duplet{'hdr'} eq $list[$i]) {### kann man hier nicht irgendwie die Gene rausziehen???
+				if ($duplet{'hdr'} eq $list[$i]) {
 					print "$duplet{'hdr'} == $list[$i]\n" if $verbose;
 					$delete = 1;
-					# remove from list, makes future searches faster 	#KM: auskommentiert damit das durchlaeuft bis es nix mehr findet!
-					# splice(@list, $i, 1);						#KM: auskommentiert
-					 last; 									#KM: was bedeuted das??
+					# remove from list, makes future searches faster
+					splice(@list, $i, 1);
+					last;
 				} 
 				else { $delete = 0 }
 			}
