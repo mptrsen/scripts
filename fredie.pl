@@ -10,32 +10,33 @@ my %opts;
 
 GetOptions( \%opts,
 	'sequence-file|s=s',
-	'thesaurus|t=s',
-	'distfile|d=s',
-	'identity-threshold=i'
+	'thesaurus-file|t=s',
+	'distribution-file|d=s',
+	'identity-threshold|i=i',
 ) or die "Unknown option";
 
-my $seqf               = $opts{'sequence-file'};
-my $thesf              = $opts{'thesaurus'};
-my $distf              = $opts{'distfile'};
+my $sequence_file      = $opts{'sequence-file'};
+my $thesaurus_file     = $opts{'thesaurus-file'};
+my $distribution_file  = $opts{'distribution-file'};
 my $identity_threshold = $opts{'identity-threshold'};
 
-my $usage = "Usage: $0 -sequence-file FASTAFILE -thesaurus THESAURUSFILE -distfile DISTFILE\n";
+my $usage = "Usage: $0 -sequence-file FASTAFILE -thesaurus THESAURUSFILE -distribution-file DISTRIBUTIONFILE\n";
 
-$seqf //= die $usage;
-$thesf //= die $usage;
-$distf //= die $usage;
+$sequence_file      //= die $usage;
+$thesaurus_file     //= die $usage;
+$distribution_file  //= die $usage;
 $identity_threshold //= 95;
 
 my $haplotype_label_format = '%.3s_%.3s_%.3s';
 
-my $sequences = Seqload::Fasta::slurp_fasta($seqf);
+my $sequences = Seqload::Fasta::slurp_fasta($sequence_file);
 
+# replace everything in the sequences that is not [ATCG] with N
 foreach my $h (keys %$sequences) {
 	$sequences->{$h} =~ s/[^ATCG]/N/g;
 }
 
-my $thesaurus = slurp_thesaurus($thesf);
+my $thesaurus = slurp_thesaurus($thesaurus_file);
 
 $sequences = correct_drainage($sequences, $thesaurus);
 
@@ -46,59 +47,21 @@ my ($haplotypes, $n_haplotypes) = haplotypify($sequences);
 print_haplotypes($haplotypes);
 print "$n_haplotypes haplotypes\n";
 
-exit;
-my $m = make_matrix($haplotypes, $drainages);
+my $matrix = make_matrix($drainages, $haplotypes);
 
-print_matrix($m);
-
-sub print_matrix {
-	my $m = shift;
-	open my $ofh, '>', 'table.txt';
-	for my $x (0 .. $#$m) {
-		for (my $y = 0; $y < scalar @{$m->[$x]}; $y++) {
-			print $ofh $m->[$x]->[$y], "\t";
-		}
-		print $ofh "\n";
-	}
-	close $ofh;
-}
+#_functions_follow__________
 
 sub make_matrix {
-	my $haplotypes = shift;
-	my $drainages  = shift;
-	my $m = [ ];
-	my $i = 0;
-	foreach my $drain (@$drainages) {
-		$m->[0]->[$i++] = $drain;
+	my $drains = shift;
+	my $haplos = shift;
+	my $m = { };
+	foreach my $drain (@$drains) {
+		foreach my $haplo (keys %$haplos) {
+			foreach my $haplodrain 
+			$m->{$drain}->{$haplo} = undef;
+		}
 	}
 	print Dumper $m; exit;
-	while (my ($species, $data) = each %$haplotypes) {
-		foreach my $set (@$data) {
-			print Dumper $set; exit;
-		}
-	}
-}
-
-sub make_matrix2 {
-	my $ht = shift;
-	my $drainages = shift;
-	my $m  = [ ];
-	my $i = 0;
-	my $j = 1;
-	foreach my $name (keys %$ht) { 
-		my ($gen, $spec) = split '_', $name, 2;
-		foreach my $haplotype (@{$ht->{$name}}) {
-			$m->[0]->[$i++] = sprintf $haplotype_label_format, $gen, $spec, $haplotype->{'drain'};
-		}
-	}
-	foreach my $drain (@$drainages) {
-		$m->[$j++]->[0] = $drain;
-	}
-	for (my $y = 1; $y < scalar @$m; $y++) {
-		for (my $x = 1; $x < scalar @$drainages; $x++) {
-			$m->[$x]->[$y] = 0;
-		}
-	}
 	return $m;
 }
 
@@ -135,16 +98,17 @@ sub haplotypify {
 		my @fields = split /_/, $h;
 		my $spec = $fields[0] . '_' . $fields[1];
 		if (exists $d->{$spec}) {
-			print "species identical: $spec\n";
+			print "Seen this species before: $spec\n";
 			# skip this if drainage and sequence are identical
 			if (grep { $fields[2] eq $_->{'drain'} } @{$d->{$spec}})  {
-				print "drain identical: $fields[2]\n";
-				print "testing $h against other seqs of this species...\n";
+				print "Drain identical: $fields[2]\n";
+				print "Testing $h against other seqs of this species...\n";
 				my $avg_diff = compare_seqs($s, $d->{$spec});
-				printf "avg diff: %f (%.2f%%)\n", $avg_diff, $avg_diff * 100;
-				if (1 - $avg_diff * 100 >= $identity_threshold / 100) {
-					print '1 - $avg_diff * 100 >= $identity_threshold / 100', "\n";
-					printf "seq more than %.2f%% identical, not a new haplotype, skipping\n", $identity_threshold ;
+				printf "avg dist: %f (%.2f%%)\n", $avg_diff, $avg_diff * 100;
+				my $diff_from_threshold = 1 - $avg_diff * 100;
+				print "Sequences are 1 - $avg_diff * 100 = $diff_from_threshold% identical (threshold: ", $identity_threshold / 100, ")\n";
+				if ($diff_from_threshold > $identity_threshold / 100) {
+					printf "Seq more than %.2f%% identical, not a new haplotype, skipping\n", $identity_threshold ;
 				}
 				# oops, the sequence is different -> new haplotype?
 				else {
@@ -154,13 +118,13 @@ sub haplotypify {
 			}
 			# new drain -> new haplotype
 			else {
-				print "new drain: $fields[2]\n";
+				print "New drain: $fields[2]\n";
 				$add = 1;
 			}
 		}
 		# new species -> new haplotype
 		else {
-			print ">>NEW HAPLOTYPE: $spec $fields[2] $fields[3]\n";
+			print "New species: $spec, $fields[2], $fields[3]\n";
 			$add = 1;
 		}
 		if ($add) {
@@ -185,8 +149,8 @@ sub compare_seqs {
 	my $sum_diffs = 0;
 	my $c = 0;
 	foreach my $prevs (@$prevseqs) {
-		my $dist = k2pdiff($newseq, $prevs->{'seq'});
-		print $dist, "\n";
+		my $dist = diff($newseq, $prevs->{'seq'});
+		printf "dist to #%d: %f\n", $c+1, 1-$dist;
 		$sum_diffs += $dist;
 		++$c;
 	}
