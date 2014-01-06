@@ -42,27 +42,101 @@ $sequences = correct_drainage($sequences, $thesaurus);
 
 my $drainages = get_unique_drainages($sequences);
 
+my $species_distribution = slurp_distribution($distribution_file);
+
 my ($haplotypes, $n_haplotypes) = haplotypify($sequences);
 
 print_haplotypes($haplotypes);
 print "$n_haplotypes haplotypes\n";
 
-my $matrix = make_matrix($drainages, $haplotypes);
+
+my $matrix = make_matrix($drainages, $haplotypes, $species_distribution);
+
+print_matrix($matrix);
 
 #_functions_follow__________
+
+sub print_matrix {
+	my $m = shift;
+	open my $tfh, '>', 'table.txt';
+	while (my ($k, $v) = each %$m) {
+		print $tfh "\t";
+		printf $tfh "%s\t", $_ foreach sort { $a cmp $b } keys %$v;
+		print $tfh "\n";
+		last;
+	}
+	while (my ($k, $v) = each %$m) {
+		print $tfh $k, "\t";
+		foreach my $ht (sort { $a cmp $b } keys %$v) {
+			print $tfh $v->{$ht}, "\t";
+		}
+		print $tfh "\n";
+	}
+	close $tfh;
+}
 
 sub make_matrix {
 	my $drains = shift;
 	my $haplos = shift;
+	my $spdist = shift;
 	my $m = { };
+	my $c = 1;
 	foreach my $drain (@$drains) {
 		foreach my $haplo (keys %$haplos) {
-			foreach my $haplodrain 
-			$m->{$drain}->{$haplo} = undef;
+			$c = 1;
+			foreach my $haplodrain (@{$haplos->{$haplo}}) {
+				# generate a new label from genus, species, drain, and an index
+				my ($gen, $spec) = split '_', $haplo;
+				my $species_full_name = sprintf '%s %s', $gen, $spec;
+				# if this combination is defined in species distribution
+				if (defined $spdist->{$drain}->{$species_full_name}) {
+					my $new_label = sprintf '%3s_%3s_%s', $gen, $spec, $haplodrain->{'drain'};
+					# and the haplotype is present in this drain, set it to 1
+					if ($spdist->{$drain}->{$species_full_name} == 1) {
+						$m->{$drain}->{$new_label} = 1;
+					}
+					# if it is not present in this drain, set it to 0
+					else {
+						$m->{$drain}->{$new_label} = 0;
+					}
+				}
+				# if it is not defined in species distribution, we don't know, so set it to '?'
+				else {
+					my $new_label = sprintf '%3s_%3s_%s', $gen, $spec, $haplodrain->{'drain'};
+					$m->{$drain}->{$new_label} = '?';
+				}
+			}
 		}
 	}
-	print Dumper $m; exit;
 	return $m;
+}
+
+sub slurp_distribution {
+	my $spdfile = shift;
+	open my $fh, '<', $spdfile;
+	my $sp = { };
+	# first line contains species list
+	my $spline = <$fh>;
+	# remove leading tabspace
+	$spline =~ s/^\t*//;
+	# remove trailing whitespace
+	$spline =~ s/\s+$//;
+	# split by tabspace
+	my $species = [ split /\t+/, $spline ];
+	print '# species: ', scalar @$species, "\n";
+	while (my $line = <$fh>) {
+		# remove trailing whitespace
+		$line =~ s/\s+$//g;
+		# split by tabspace
+		my @cols = split /\t+/, $line;
+		$sp->{$cols[0]} = { };
+		foreach (1..$#cols-1) {
+			if (defined $species->[$_]) {
+				$sp->{$cols[0]}->{$species->[$_]} = $cols[$_];
+			}
+		}
+	}
+	return $sp;
 }
 
 sub print_new_fasta {
