@@ -50,6 +50,7 @@ print_haplotypes($haplotypes);
 print "$n_haplotypes haplotypes\n";
 
 
+print "Making matrix...\n";
 my $matrix = make_matrix($drainages, $haplotypes, $species_distribution);
 
 print_matrix($matrix);
@@ -85,24 +86,27 @@ sub make_matrix {
 		foreach my $haplo (keys %$haplos) {
 			$c = 1;
 			foreach my $haplodrain (@{$haplos->{$haplo}}) {
-				# generate a new label from genus, species, drain, and an index
+				# generate a new label from genus, species, and drain
 				my ($gen, $spec) = split '_', $haplo;
 				my $species_full_name = sprintf '%s %s', $gen, $spec;
+				my $new_label = sprintf '%3s_%3s_%s', $gen, $spec, $haplodrain->{'drain'};
 				# if this combination is defined in species distribution
 				if (defined $spdist->{$drain}->{$species_full_name}) {
-					my $new_label = sprintf '%3s_%3s_%s', $gen, $spec, $haplodrain->{'drain'};
+					print "$drain + $species_full_name defined in species distribution\n";
 					# and the haplotype is present in this drain, set it to 1
 					if ($spdist->{$drain}->{$species_full_name} == 1) {
+						print "$species_full_name present in $drain, set to 1\n";
 						$m->{$drain}->{$new_label} = 1;
 					}
 					# if it is not present in this drain, set it to 0
 					else {
+						print "$species_full_name not present in $drain, set to 0\n";
 						$m->{$drain}->{$new_label} = 0;
 					}
 				}
 				# if it is not defined in species distribution, we don't know, so set it to '?'
 				else {
-					my $new_label = sprintf '%3s_%3s_%s', $gen, $spec, $haplodrain->{'drain'};
+					print "$drain + $species_full_name not defined in species distribution, set to ?\n";
 					$m->{$drain}->{$new_label} = '?';
 				}
 			}
@@ -123,16 +127,18 @@ sub slurp_distribution {
 	$spline =~ s/\s+$//;
 	# split by tabspace
 	my $species = [ split /\t+/, $spline ];
-	print '# species: ', scalar @$species, "\n";
+	print '# species in distribution table: ', scalar @$species, "\n";
 	while (my $line = <$fh>) {
 		# remove trailing whitespace
 		$line =~ s/\s+$//g;
 		# split by tabspace
 		my @cols = split /\t+/, $line;
 		$sp->{$cols[0]} = { };
-		foreach (1..$#cols-1) {
-			if (defined $species->[$_]) {
-				$sp->{$cols[0]}->{$species->[$_]} = $cols[$_];
+		foreach (1..$#cols) {
+			if (defined $species->[$_-1]) {
+				$sp->{$cols[0]}->{$species->[$_-1]} = $cols[$_];
+			}
+			else {
 			}
 		}
 	}
@@ -165,26 +171,27 @@ sub print_haplotypes {
 
 sub haplotypify {
 	my $seqs = shift;
-	my $d = {};
+	my $data = {};
 	my $add = 0;
 	my $n_ht;
 	while (my ($h, $s) = each %$seqs) {
 		my @fields = split /_/, $h;
 		my $spec = $fields[0] . '_' . $fields[1];
-		if (exists $d->{$spec}) {
+		if (exists $data->{$spec}) {
 			print "Seen this species before: $spec\n";
-			# skip this if drainage and sequence are identical
-			if (grep { $fields[2] eq $_->{'drain'} } @{$d->{$spec}})  {
-				print "Drain identical: $fields[2]\n";
+			# skip this if drainage and sequence are (almost) identical
+			if (grep { $fields[2] eq $_->{'drain'} } @{$data->{$spec}})  {
+				print "Seen this species in this drain before: $spec, $fields[2]\n";
 				print "Testing $h against other seqs of this species...\n";
-				my $avg_diff = compare_seqs($s, $d->{$spec});
-				printf "avg dist: %f (%.2f%%)\n", $avg_diff, $avg_diff * 100;
-				my $diff_from_threshold = 1 - $avg_diff * 100;
-				print "Sequences are 1 - $avg_diff * 100 = $diff_from_threshold% identical (threshold: ", $identity_threshold / 100, ")\n";
-				if ($diff_from_threshold > $identity_threshold / 100) {
+				my $avg_diff = compare_seqs($s, $data->{$spec});
+				my $avg_diff_perc = $avg_diff * 100;
+				printf "avg dist: %f (%.2f%%)\n", $avg_diff, $avg_diff_perc;
+				print "Sequences are $avg_diff_perc% identical (threshold: ", $identity_threshold, ")\n";
+				if ($avg_diff_perc > $identity_threshold) {
 					printf "Seq more than %.2f%% identical, not a new haplotype, skipping\n", $identity_threshold ;
+					next;
 				}
-				# oops, the sequence is different -> new haplotype?
+				# oops, the sequence is different -> new haplotype
 				else {
 					print "!! SEQ DIFFERENT !!\n";
 					$add = 1;
@@ -202,7 +209,7 @@ sub haplotypify {
 			$add = 1;
 		}
 		if ($add) {
-			push @{$d->{$spec}}, {
+			push @{$data->{$spec}}, {
 				'drain'   => $fields[2],
 				'country' => $fields[3],
 				'plate'   => $fields[4],
@@ -214,7 +221,7 @@ sub haplotypify {
 			printf ">>Added new haplotype: %s, %s, %s\n", $spec, $fields[2], $fields[3];
 		}
 	}
-	return ($d, $n_ht);
+	return ($data, $n_ht);
 }
 
 sub compare_seqs {
@@ -303,8 +310,8 @@ sub diff {
 			$s_diff++;
 		}
 	}
-	printf "eq: %d\nambig: %d\ndiff: %d\nperc eq: %.2f\n", $s_equal, $s_ambig, $s_diff, $s_equal/length $seqA;
-	return sprintf("%.2f", $s_equal/length($seqA));
+	printf "eq: %d\nambig: %d\ndiff: %d\nperc eq: %f\n", $s_equal, $s_ambig, $s_diff, $s_equal/length $seqA;
+	return $s_equal/length($seqA);
 }
 
 sub get_unique_drainages {
