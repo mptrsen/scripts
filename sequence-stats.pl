@@ -3,40 +3,116 @@ use strict;
 use warnings;
 use autodie;
 
-my $usage = "$0 INFILE";
+my $usage = "Usage: $0 INFILE\n";
 my $inf = shift @ARGV or die $usage;
 
 my $total_length = 0;
 my $n50 = 0;
 my $n90 = 0;
+my $perc_A = 0;
+my $perc_T = 0;
+my $perc_C = 0;
+my $perc_G = 0;
+my $n_A = 0;
+my $n_T = 0;
+my $n_C = 0;
+my $n_G = 0;
+my $n_500plus = 0;
+my $n_1k_plus = 0;
+my $n_10k_plus = 0;
+my $n_100k_plus = 0;
+my $n_1m_plus = 0;
+my $shortest = 0;
+my $longest = 0;
 
 my $fh = Seqload::Fasta->open($inf);
 
 my @seqs = ();
 
 while (my ($h, $s) = $fh->next_seq()) {
-	$total_length += length $s;
+	my $len = length $s;
+	$total_length += $len;
+	# categorize by length
+	if    ($len > 1_000_000)  { $n_1m_plus++   }
+	elsif ($len > 100_000)    { $n_100k_plus++ }
+	elsif ($len > 10_000)     { $n_10k_plus++  }
+	elsif ($len > 1000)       { $n_1k_plus++   }
+	elsif ($len > 500)        { $n_500plus++   }
+	# count bases
+	$n_A++ while $s =~ m/a/gi;
+	$n_T++ while $s =~ m/t/gi;
+	$n_C++ while $s =~ m/c/gi;
+	$n_G++ while $s =~ m/g/gi;
 	push @seqs, $s;
 }
+
+# exit if file contains zero sequences
+if (scalar @seqs == 0) { 
+	print "no sequences\n";
+	exit;
+}
+
+# calculate percentages
+$perc_A = $n_A / $total_length;
+$perc_T = $n_T / $total_length;
+$perc_C = $n_C / $total_length;
+$perc_G = $n_G / $total_length;
 
 @seqs = sort { length $a <=> length $b } @seqs;
 
 my $tmp_len = 0;
 
+$longest = $shortest = length $seqs[0];
+
 foreach my $s (@seqs) {
+	my $len = length $s;
+	# longest and shortest
+	$shortest = $len if $len < $shortest;
+	$longest = $len if $len > $longest;
 	# n90
-	if ($tmp_len + length $s > $total_length * 0.9) {
+	if ($n90 == 0 and $tmp_len + $len > $total_length * 0.9) {
 		$n90 = $tmp_len;
 	}
 	# n50
-	elsif ($tmp_len + length $s > $total_length/2) {
+	elsif ($n50 == 0 and $tmp_len + $len > $total_length/2) {
 		$n50 = $tmp_len;
 	}
 	$tmp_len += length $s;
 }
 
 # report
-printf "sequences: %d\ntotal_length: %d\nn50: %d\nn90: %d\n", scalar @seqs, $total_length, $n50, $n90;
+printf "sequences: %d\n" .
+       "total_length: %d\n" .
+			 "longest: %d\n" .
+			 "shortest: %d\n" .
+			 "n50: %d\n" .
+			 "n90: %d\n" .
+			 "seqs > 500 nt: %d\n" .
+			 "seqs > 1k nt: %d\n" .
+			 "seqs > 10k nt: %d\n" .
+			 "seqs > 100k nt: %d\n" .
+			 "seqs > 1M nt: %d\n" .
+			 "perc A: %.2f\n" .
+			 "perc T: %.2f\n" .
+			 "perc C: %.2f\n" .
+			 "perc G: %.2f\n" .
+			 '',
+			 scalar @seqs,
+			 $total_length,
+			 $longest,
+			 $shortest,
+			 $n50,
+			 $n90,
+			 $n_500plus,
+			 $n_1k_plus,
+			 $n_10k_plus,
+			 $n_100k_plus,
+			 $n_1m_plus,
+			 $perc_A,
+			 $perc_T,
+			 $perc_C,
+			 $perc_G,
+			 ;
 
 
 package Seqload::Fasta;
