@@ -17,6 +17,7 @@ my $n_A = 0;
 my $n_T = 0;
 my $n_C = 0;
 my $n_G = 0;
+my $n_1plus   = 0;
 my $n_500plus = 0;
 my $n_1k_plus = 0;
 my $n_10k_plus = 0;
@@ -38,6 +39,7 @@ while (my ($h, $s) = $fh->next_seq()) {
 	elsif ($len > 10_000)     { $n_10k_plus++  }
 	elsif ($len > 1000)       { $n_1k_plus++   }
 	elsif ($len > 500)        { $n_500plus++   }
+	else                      { $n_1plus++     }
 	# count bases
 	$n_A++ while $s =~ m/a/gi;
 	$n_T++ while $s =~ m/t/gi;
@@ -87,6 +89,7 @@ printf "sequences: %d\n" .
 			 "shortest: %d\n" .
 			 "n50: %d\n" .
 			 "n90: %d\n" .
+			 "seqs > 1 nt: %d\n" .
 			 "seqs > 500 nt: %d\n" .
 			 "seqs > 1k nt: %d\n" .
 			 "seqs > 10k nt: %d\n" .
@@ -103,6 +106,7 @@ printf "sequences: %d\n" .
 			 $shortest,
 			 $n50,
 			 $n90,
+			 $n_1plus,
 			 $n_500plus,
 			 $n_1k_plus,
 			 $n_10k_plus,
