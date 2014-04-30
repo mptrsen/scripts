@@ -8,9 +8,11 @@ use File::Spec;
 use Getopt::Long;
 
 my $skipfirst = 0;
+my $skipall   = 0;
 
 GetOptions(
 	'skipfirst' => \$skipfirst,
+	'skipall'   => \$skipall,
 );
 
 my $usage = "Usage: $0 OGSFILE TRANSCRIPTOMEFILE\n";
@@ -26,9 +28,10 @@ unless (scalar keys %$ogs == scalar keys %$transcripts) {
 	print "Unequal number of sequences!\n";
 }
 
-my %seen = ();
-my $nupd = 0;
-my $n = 0;
+my %seen    = ();
+my $nupd    = 0;
+my $nunchgd = 0;
+my $n       = 0;
 
 my $new_ogs_file = File::Spec->catfile('/tmp', 'corresp-' . basename($ARGV[0]));
 my $new_transcripts_file = File::Spec->catfile('/tmp', 'corresp-' . basename($ARGV[1]));
@@ -37,7 +40,11 @@ open my $new_transcripts, '>', $new_transcripts_file;
 
 foreach my $hdr (sort {$a cmp $b} keys %$ogs) {
 	unless (exists $transcripts->{$hdr}) {
-		if ($skipfirst) {
+		if ($skipall) {
+			print "Not found in transcriptome: $hdr, skipping\n";
+			next;
+		}
+		elsif ($skipfirst) {
 			print "Not found in transcriptome: $hdr, skipping\n";
 			$skipfirst = 0;
 			next;
@@ -66,7 +73,7 @@ foreach my $hdr (sort {$a cmp $b} keys %$ogs) {
 	# run exonerate
 	my @command = qq( exonerate --bestn 1 --score $score_threshold --ryo '$exonerate_ryo' --model $exonerate_model --querytype protein --targettype dna --verbose 0 --showalignment no --showvulgar no $aafn $ntfn > $outfile );
 
-	system(@command) and die $?;
+	system("@command") and die $?;
 
 	# write new sequences to file
 	my $res = Seqload::Fasta::slurp_fasta($outfile);
@@ -82,6 +89,9 @@ foreach my $hdr (sort {$a cmp $b} keys %$ogs) {
 		
 	}
 	else {
+		printf $new_ogs ">%s\n%s\n", $hdr, $res->{'qa'};
+		printf $new_transcripts ">%s\n%s\n", $hdr, $res->{'ca'};
+		++$nunchgd;
 		print "done, unchanged\n";
 	}
 	++$n;

@@ -13,10 +13,12 @@ my $perc_A = 0;
 my $perc_T = 0;
 my $perc_C = 0;
 my $perc_G = 0;
+my $perc_N = 0;
 my $n_A = 0;
 my $n_T = 0;
 my $n_C = 0;
 my $n_G = 0;
+my $n_N = 0;
 my $n_1plus   = 0;
 my $n_500plus = 0;
 my $n_1k_plus = 0;
@@ -41,10 +43,13 @@ while (my ($h, $s) = $fh->next_seq()) {
 	elsif ($len > 500)        { $n_500plus++   }
 	else                      { $n_1plus++     }
 	# count bases
-	$n_A++ while $s =~ m/a/gi;
-	$n_T++ while $s =~ m/t/gi;
-	$n_C++ while $s =~ m/c/gi;
-	$n_G++ while $s =~ m/g/gi;
+	for (my $i = 0; $i > length $s; $i++) {
+		if (uc(substr($s, $i, 1)) eq 'A') { ++$n_A }
+		elsif (uc(substr($s, $i, 1)) eq 'T') { ++$n_T }
+		elsif (uc(substr($s, $i, 1)) eq 'C') { ++$n_C }
+		elsif (uc(substr($s, $i, 1)) eq 'G') { ++$n_G }
+		else { ++$n_N }
+	}
 	push @seqs, $s;
 }
 
@@ -59,6 +64,7 @@ $perc_A = $n_A / $total_length;
 $perc_T = $n_T / $total_length;
 $perc_C = $n_C / $total_length;
 $perc_G = $n_G / $total_length;
+$perc_N = $n_N / $total_length;
 
 @seqs = sort { length $a <=> length $b } @seqs;
 
@@ -99,6 +105,7 @@ printf "sequences: %d\n" .
 			 "perc T: %.2f\n" .
 			 "perc C: %.2f\n" .
 			 "perc G: %.2f\n" .
+			 "perc N: %.2f\n" .
 			 '',
 			 scalar @seqs,
 			 $total_length,
@@ -116,6 +123,7 @@ printf "sequences: %d\n" .
 			 $perc_T,
 			 $perc_C,
 			 $perc_G,
+			 $perc_N,
 			 ;
 
 
