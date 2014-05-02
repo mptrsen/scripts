@@ -19,6 +19,7 @@ my $usage = "Usage: $0 OGSFILE TRANSCRIPTOMEFILE\n";
 
 scalar @ARGV == 2 or die $usage;
 
+print "Call: $0 @ARGV\n";
 
 my $ogs = Seqload::Fasta::slurp_fasta($ARGV[0]);
 
@@ -32,6 +33,8 @@ my %seen    = ();
 my $nupd    = 0;
 my $nunchgd = 0;
 my $n       = 0;
+my $nseqs   = scalar keys %$ogs;
+my $c       = 0;
 
 my $new_ogs_file = File::Spec->catfile('/tmp', 'corresp-' . basename($ARGV[0]));
 my $new_transcripts_file = File::Spec->catfile('/tmp', 'corresp-' . basename($ARGV[1]));
@@ -39,21 +42,23 @@ open my $new_ogs, '>', $new_ogs_file;
 open my $new_transcripts, '>', $new_transcripts_file;
 
 foreach my $hdr (sort {$a cmp $b} keys %$ogs) {
+	++$c;
 	unless (exists $transcripts->{$hdr}) {
 		if ($skipall) {
-			print "Not found in transcriptome: $hdr, skipping\n";
+			print "Not found in transcriptome: '$hdr', skipping\n";
 			next;
 		}
 		elsif ($skipfirst) {
-			print "Not found in transcriptome: $hdr, skipping\n";
+			print "Not found in transcriptome: '$hdr', skipping\n";
 			$skipfirst = 0;
 			next;
-		} else {
-			die "Not found in transcriptome: $hdr\n";
+		}
+		else {
+			print "Not found in transcriptome: '$hdr', exiting\n" and exit(1);
 		}
 	}
 	
-	die "Non-unique header: $hdr\n" if $seen{$hdr}++;
+	print "Non-unique header: $hdr\n" and exit(1) if $seen{$hdr}++;
 	
 	# print to files 
 	my $aafn = fastaify($hdr, $ogs->{$hdr});
@@ -67,8 +72,9 @@ foreach my $hdr (sort {$a cmp $b} keys %$ogs) {
 
 	#printf ">%s\n%s\n>%s\n%s\n", $hdr . ' (query)', $ogs->{$hdr}, $hdr . ' (target)', $transcripts->{$hdr};
 
+	# set output buffer to flush immediately
 	local $| = 0;
-	print "Checking $hdr... ";
+	print "Checking $hdr ($c of $nseqs)... ";
 	
 	# run exonerate
 	my @command = qq( exonerate --bestn 1 --score $score_threshold --ryo '$exonerate_ryo' --model $exonerate_model --querytype protein --targettype dna --verbose 0 --showalignment no --showvulgar no $aafn $ntfn > $outfile );
@@ -94,10 +100,19 @@ foreach my $hdr (sort {$a cmp $b} keys %$ogs) {
 		++$nunchgd;
 		print "done, unchanged\n";
 	}
+
+	# count and set output buffer back
 	++$n;
+	local $| = 1;
 }
 
-print "Done, updated $nupd of $n sequences, written to $new_ogs_file and $new_transcripts_file\n";
+printf "Done, updated %d of %d sequences, wrote %d sequences to %s and %s\n",
+	$nupd,
+	$n,
+	$nupd + $nunchgd,
+	$new_ogs_file,
+	$new_transcripts_file,
+;
 
 exit;
 

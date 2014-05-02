@@ -7,8 +7,10 @@ use File::Spec;
 use File::Basename;
 use IO::File;
 
-my $infa = shift @ARGV or die "Usage: $0 INFILE_A INFILE_B\n";
-my $infb = shift @ARGV or die "Usage: $0 INFILE_A INFILE_B\n";
+scalar @ARGV == 2 or die "Usage: $0 INFILE_A INFILE_B\n";
+
+my $infa = shift @ARGV;
+my $infb = shift @ARGV;
 
 # inf a must be the transcriptome file
 my $infh = Seqload::Fasta->open($infa);
@@ -28,7 +30,7 @@ $infh = Seqload::Fasta->open($infb);
 my $pp = {};
 
 while (my ($h, $s) = $infh->next_seq()) {
-	$h =~ /^DMELA (FBpp\d+)\b/;
+	$h =~ /^(FBpp\d+)\b/;
 	my $ppid = $1;
 	$h =~ /parent=FBgn\d+,(FBtr\d+);/;
 	my $trid = $1;
