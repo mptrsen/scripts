@@ -21,9 +21,9 @@ scalar @ARGV == 2 or die $usage;
 
 print "Call: $0 @ARGV\n";
 
-my $ogs = Seqload::Fasta::slurp_fasta($ARGV[0]);
+my $ogs = slurp_fasta($ARGV[0]);
 
-my $transcripts = Seqload::Fasta::slurp_fasta($ARGV[1]);
+my $transcripts = slurp_fasta($ARGV[1]);
 
 unless (scalar keys %$ogs == scalar keys %$transcripts) {
 	print "Unequal number of sequences!\n";
@@ -42,6 +42,7 @@ open my $new_ogs, '>', $new_ogs_file;
 open my $new_transcripts, '>', $new_transcripts_file;
 
 foreach my $hdr (sort {$a cmp $b} keys %$ogs) {
+
 	++$c;
 	unless (exists $transcripts->{$hdr}) {
 		if ($skipall) {
@@ -57,15 +58,15 @@ foreach my $hdr (sort {$a cmp $b} keys %$ogs) {
 			print "Not found in transcriptome: '$hdr', exiting\n" and exit(1);
 		}
 	}
-	
+
 	print "Non-unique header: $hdr\n" and exit(1) if $seen{$hdr}++;
-	
+
 	# print to files 
 	my $aafn = fastaify($hdr, $ogs->{$hdr});
 	my $ntfn = fastaify($hdr, $transcripts->{$hdr});
 
 	# some settings
-	my $outfile         = '/tmp/exonerate.out';
+	my $outfile         = File::Temp->new();
 	my $score_threshold = 30;
 	my $exonerate_model = 'protein2genome';
 	my $exonerate_ryo   = '>ca\n%tcs>qa\n%qas';
@@ -77,12 +78,25 @@ foreach my $hdr (sort {$a cmp $b} keys %$ogs) {
 	print "Checking $hdr ($c of $nseqs)... ";
 	
 	# run exonerate
-	my @command = qq( exonerate --bestn 1 --score $score_threshold --ryo '$exonerate_ryo' --model $exonerate_model --querytype protein --targettype dna --verbose 0 --showalignment no --showvulgar no $aafn $ntfn > $outfile );
+	my @command = QW( "exonerate
+		--bestn 1
+		--score $score_threshold
+		--ryo '$exonerate_ryo'
+		--model $exonerate_model
+		--querytype protein
+		--targettype dna
+		--verbose 0
+		--showalignment no
+		--showvulgar no
+		--query $aafn
+		--target $ntfn
+		> $outfile"
+	);
 
 	system("@command") and die $?;
 
 	# write new sequences to file
-	my $res = Seqload::Fasta::slurp_fasta($outfile);
+	my $res = slurp_fasta($outfile);
 	if (!$res->{'ca'}) {
 		print "no alignment found!\n";
 		next;
@@ -90,19 +104,22 @@ foreach my $hdr (sort {$a cmp $b} keys %$ogs) {
 	elsif ($res->{'ca'} ne $transcripts->{$hdr}) {
 		printf $new_ogs ">%s\n%s\n", $hdr, $res->{'qa'};
 		printf $new_transcripts ">%s\n%s\n", $hdr, $res->{'ca'};
+		# count
 		++$nupd;
+		++$n;
 		print "done, updated\n";
 		
 	}
 	else {
 		printf $new_ogs ">%s\n%s\n", $hdr, $res->{'qa'};
 		printf $new_transcripts ">%s\n%s\n", $hdr, $res->{'ca'};
+		# count
 		++$nunchgd;
+		++$n;
 		print "done, unchanged\n";
 	}
 
-	# count and set output buffer back
-	++$n;
+	# set output buffer back
 	local $| = 1;
 }
 
@@ -123,64 +140,34 @@ sub fastaify {
 	return $fh;
 }
 
-# Documentation before the code#{{{
-=head1 NAME
+# loads a Fasta file into a hashref
+# arguments: scalar string path to file
+# returns: hashref (header => sequence)
+sub slurp_fasta {
+	my $infile = shift;
+	my $sequences = {};
+	my $infh = Seqload::Fasta->open($infile);
+	while (my ($h, $s) = $infh->next_seq()) {
+		# remove possible taxon shorthand
+		$h =~ s/^[A-Z]{5} //;
+		# we only need the id field
+		my @fields = split /\s+/, $h;
+		# remove possible -R*/-P* suffixes
+		$fields[0] =~ s/-[RPT][A-H]$//;
+		# remove pipes
+		$fields[0] =~ s/\|/_/g;
+		# ok you got it
+		$sequences->{$fields[0]} = $s;
+	}
+	undef $infh;
+	return $sequences;
+}
 
-Seqload::Fasta
-
-=head1 DESCRIPTION
-
-A library for handling FASTA sequences in an object-oriented fashion. 
-Incompatibility with BioPerl is intentional.
-
-=head1 SYNOPSIS
-
-  use Seqload::Fasta qw(fasta2csv check_if_fasta);
-  
-  # test whether this is a valid fasta file
-  check_if_fasta($filename) or die "Not a valid fasta file: $filename\n";
-
-  # open the file, return fasta file object
-  my $file = Seqload::Fasta->open($filename);
-  
-  # loop through the sequences
-  while (my ($hdr, $seq) = $file->next_seq) {
-    print $hdr . "\n" . $seq . "\n";
-  }
-
-  # just undef the object, the destructor closes the file
-  undef($file)
-
-  # convert a fasta file to a csv file
-  fasta2csv($fastafile, $csvfile);
-
-
-=head1 METHODS
-
-=head2 open(FILENAME)
-
-Opens a fasta file. Returns a sequence database object.
-
-=head2 next_seq
-
-Returns the next sequence in a sequence database object as an array (HEADER,
-SEQUENCE). Note that the '>' character is truncated from the header.
-
-  ($header, $sequence) = $file->next_seq;
-
-=head1 FUNCTIONS
-
-=head2 fasta2csv($fastafile, $csvfile)
-
-Converts a fasta file into a csv file where each line consists of
-'HEADER,SEQUENCE'. Manages opening, parsing and closing of the files, no
-additional file handles necessary.
-
-=head2 check_if_fasta($file)
-
-Checks whether or not the specified file is a valid fasta file (i.e., starts with a header line). Returns 0 if not and 1 otherwise.
-
-=cut#}}}
+sub QW {
+	my $s = shift;
+	$s =~ s/\n//g;
+	return split /\s+/, $s;
+}
 
 package Seqload::Fasta;
 use strict;
@@ -272,26 +259,5 @@ sub check_if_fasta {
 	my $infh = Seqload::Fasta->open($infile);
 	my ($h, $s) = $infh->next_seq() or return 0;
 	return 1;
-}
-
-# loads a Fasta file into a hashref
-# arguments: scalar string path to file
-# returns: hashref (header => sequence)
-sub slurp_fasta {
-	my $infile = shift;
-	my $sequences = {};
-	my $infh = Seqload::Fasta->open($infile);
-	while (my ($h, $s) = $infh->next_seq()) {
-		# remove possible taxon shorthand
-		$h =~ s/^[A-Z]{5} //;
-		# we only need the id field
-		my @fields = split /\s+/, $h;
-		# remove possible -RA/-PA suffixes
-		$fields[0] =~ s/-\w\w//;
-		# ok you got it
-		$sequences->{$fields[0]} = $s;
-	}
-	undef $infh;
-	return $sequences;
 }
 

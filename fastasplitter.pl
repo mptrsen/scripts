@@ -7,16 +7,18 @@ use Getopt::Long;
 my $force  = 0;
 my $nfiles = 0;
 my $nseqs  = 0;
+my $basename = 'sequences';
 
-GetOptions( 'force|f' => \$force, 'nfiles=i' => \$nfiles, 'nseqs=i' => \$nseqs ) or die ;
+GetOptions( 'force|f' => \$force, 'nfiles=i' => \$nfiles, 'nseqs=i' => \$nseqs, 'basename=s' => \$basename ) or die ;
 
 my $usage = "USAGE: $0 [OPTIONS] FASTAFILE [FASTAFILE FASTAFILE ...]\n\n";
 $usage .= "Options:\n";
 $usage .= "  --force : overwrite existing files\n";
 $usage .= "  --nfiles N : split into N files\n";
 $usage .= "  --nseqs N : split into files with N sequences each\n";
+$usage .= "  --basename S: name the files S_N.fa\n";
 
-unless (scalar @ARGV != 0) { print $usage and exit }
+if (scalar @ARGV == 0 or (!$nseqs and !$nfiles)) { print $usage and exit }
 
 my $seqs = slurp_fasta_arrayref(shift @ARGV );
 
@@ -28,12 +30,14 @@ foreach my $file (@ARGV) {
 
 die if scalar(@$seqs) % 2 != 0;
 
+
 if ($nfiles) {
+	my $fn_len = length $nfiles;
 	my $n_sequences = int(scalar @$seqs / 2 / $nfiles);
 
 	for (my $i = 1; $i <= $nfiles; $i++) {
 
-		my $fn = sprintf "sequences_%0d.fa", $i;
+		my $fn = sprintf "%s_%0${fn_len}d.fa", $basename, $i;
 
 		if (-e $fn and not $force) { print "file $fn exists. Use --force to overwrite\n" and exit }
 
@@ -47,7 +51,7 @@ if ($nfiles) {
 		close $outfh;
 	}
 	# put the rest of the sequences into an overspill file
-	my $fn = 'sequences_overspill.fa';
+	my $fn = $basename . '_overspill.fa';
 	my $n = 0;
 	open my $outfh, '>', $fn;
 	while (my ($h, $s) = splice(@$seqs, 0, 2)) {
@@ -60,10 +64,12 @@ if ($nfiles) {
 
 elsif ($nseqs) {
 	my $n = 0;
+	my $fn_len = int(scalar(@$seqs) / $nseqs);
+
 	while (scalar @$seqs != 0) {
 		$n++;
 		my $c = 0;
-		my $fn = sprintf "sequences_%0d.fa", $n;
+		my $fn = sprintf "%s_%0${fn_len}d.fa", $basename, $n;
 
 		if (-e $fn and not $force) { print "file $fn exists. Use --force to overwrite\n" and exit }
 
