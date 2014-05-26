@@ -16,7 +16,7 @@ $usage .= "Options:\n";
 $usage .= "  --force : overwrite existing files\n";
 $usage .= "  --nfiles N : split into N files\n";
 $usage .= "  --nseqs N : split into files with N sequences each\n";
-$usage .= "  --basename S: name the files S_N.fa\n";
+$usage .= "  --basename S : name the files S_1.fa, S_2.fa, ...\n";
 
 if (scalar @ARGV == 0 or (!$nseqs and !$nfiles)) { print $usage and exit }
 
