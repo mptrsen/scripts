@@ -4,12 +4,13 @@ use warnings;
 use autodie;
 use Getopt::Long;
 
-my $force  = 0;
-my $nfiles = 0;
-my $nseqs  = 0;
-my $basename = 'sequences';
+my $force        = 0;
+my $nfiles       = 0;
+my $nseqs        = 0;
+my $basename     = 'sequences';
+my $no_overspill = 0;
 
-GetOptions( 'force|f' => \$force, 'nfiles=i' => \$nfiles, 'nseqs=i' => \$nseqs, 'basename=s' => \$basename ) or die ;
+GetOptions( 'force|f' => \$force, 'nfiles=i' => \$nfiles, 'nseqs=i' => \$nseqs, 'basename=s' => \$basename, 'no-overspill' => \$no_overspill ) or die "Error while catching command line options\n";
 
 my $usage = "USAGE: $0 [OPTIONS] FASTAFILE [FASTAFILE FASTAFILE ...]\n\n";
 $usage .= "Options:\n";
@@ -17,6 +18,7 @@ $usage .= "  --force : overwrite existing files\n";
 $usage .= "  --nfiles N : split into N files\n";
 $usage .= "  --nseqs N : split into files with N sequences each\n";
 $usage .= "  --basename S : name the files S_1.fa, S_2.fa, ...\n";
+$usage .= "  --no-overspill : don't create an extra overspill file; overspill sequences are appended to the last file\n";
 
 if (scalar @ARGV == 0 or (!$nseqs and !$nfiles)) { print $usage and exit }
 
@@ -34,10 +36,11 @@ die if scalar(@$seqs) % 2 != 0;
 if ($nfiles) {
 	my $fn_len = length $nfiles;
 	my $n_sequences = int(scalar @$seqs / 2 / $nfiles);
+	my $fn;
 
 	for (my $i = 1; $i <= $nfiles; $i++) {
 
-		my $fn = sprintf "%s_%0${fn_len}d.fa", $basename, $i;
+		$fn = sprintf "%s_%0${fn_len}d.fa", $basename, $i;
 
 		if (-e $fn and not $force) { print "file $fn exists. Use --force to overwrite\n" and exit }
 
@@ -50,16 +53,29 @@ if ($nfiles) {
 		printf "wrote %d sequences to file '%s'\n", $n_sequences, $fn;
 		close $outfh;
 	}
-	# put the rest of the sequences into an overspill file
-	my $fn = $basename . '_overspill.fa';
-	my $n = 0;
-	open my $outfh, '>', $fn;
-	while (my ($h, $s) = splice(@$seqs, 0, 2)) {
-		printf $outfh ">%s\n%s\n", $h, $s;
-		$n++;
+	if ($no_overspill) {
+		my $n = 0;
+		open my $outfh, '>>', $fn;
+		while (my ($h, $s) = splice(@$seqs, 0, 2)) {
+			printf $outfh ">%s\n%s\n", $h, $s;
+			$n++;
+		}
+		printf "wrote %d overspill sequence(s) to file '%s'\n", $n, $fn;
+		close $outfh;
+
 	}
-	printf "wrote %d overspill sequence(s) to file '%s'\n", $n, $fn;
-	close $outfh;
+	else {
+		# put the rest of the sequences into an overspill file
+		$fn = $basename . '_overspill.fa';
+		my $n = 0;
+		open my $outfh, '>', $fn;
+		while (my ($h, $s) = splice(@$seqs, 0, 2)) {
+			printf $outfh ">%s\n%s\n", $h, $s;
+			$n++;
+		}
+		printf "wrote %d overspill sequence(s) to file '%s'\n", $n, $fn;
+		close $outfh;
+	}
 }
 
 elsif ($nseqs) {
