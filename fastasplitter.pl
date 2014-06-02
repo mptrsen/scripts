@@ -33,10 +33,12 @@ foreach my $file (@ARGV) {
 die if scalar(@$seqs) % 2 != 0;
 
 
+# split the sequences so that they result in $nfiles files, plus possible overspill file
 if ($nfiles) {
 	my $fn_len = length $nfiles;
 	my $n_sequences = int(scalar @$seqs / 2 / $nfiles);
 	my $fn;
+	my $outfh;
 
 	for (my $i = 1; $i <= $nfiles; $i++) {
 
@@ -44,7 +46,7 @@ if ($nfiles) {
 
 		if (-e $fn and not $force) { print "file $fn exists. Use --force to overwrite\n" and exit }
 
-		open my $outfh, '>', $fn;
+		open $outfh, '>', $fn;
 		
 		for (my $j = 0; $j < $n_sequences; $j++) {
 			my ($h, $s) = splice(@$seqs, 0, 2);
@@ -53,31 +55,27 @@ if ($nfiles) {
 		printf "wrote %d sequences to file '%s'\n", $n_sequences, $fn;
 		close $outfh;
 	}
-	if ($no_overspill) {
-		my $n = 0;
-		open my $outfh, '>>', $fn;
-		while (my ($h, $s) = splice(@$seqs, 0, 2)) {
-			printf $outfh ">%s\n%s\n", $h, $s;
-			$n++;
-		}
-		printf "wrote %d overspill sequence(s) to file '%s'\n", $n, $fn;
-		close $outfh;
 
+	# no overspill file requested, append the rest of the sequences to the last file
+	if ($no_overspill) {
+		open $outfh, '>>', $fn;
 	}
+	# or put the rest of the sequences into an overspill file
 	else {
-		# put the rest of the sequences into an overspill file
 		$fn = $basename . '_overspill.fa';
-		my $n = 0;
-		open my $outfh, '>', $fn;
-		while (my ($h, $s) = splice(@$seqs, 0, 2)) {
-			printf $outfh ">%s\n%s\n", $h, $s;
-			$n++;
-		}
-		printf "wrote %d overspill sequence(s) to file '%s'\n", $n, $fn;
-		close $outfh;
+		open $outfh, '>', $fn;
+	}
+	my $n = 0;
+	while (my ($h, $s) = splice(@$seqs, 0, 2)) {
+		printf $outfh ">%s\n%s\n", $h, $s;
+		$n++;
+	}
+	printf "wrote %d overspill sequence(s) to file '%s'\n", $n, $fn;
+	close $outfh;
 	}
 }
 
+# split the sequences so that they result in any number of files with $nseqs sequences each
 elsif ($nseqs) {
 	my $n = 0;
 	my $fn_len = int(scalar(@$seqs) / $nseqs);
