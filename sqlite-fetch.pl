@@ -10,22 +10,9 @@ use Time::HiRes;
 my $database = '/home/mpetersen/orthograph/orthograph.sqlite';
 
 my $query = <<"EOSQL";
-
-SELECT DISTINCT
-                        o_blast_9.target,
-                        o_blast_9.score,
-                        o_blast_9.evalue,
-                        o_blast_9.start,
-                        o_blast_9.end
-                FROM o_hmmsearch_9
-                LEFT JOIN o_blast_9
-                        ON o_hmmsearch_9.id = o_blast_9.hmmsearch_id
-                WHERE o_hmmsearch_9.id         IS NOT NULL
-                        AND o_blast_9.hmmsearch_id   IS NOT NULL
-                        AND o_hmmsearch_9.id         = 11787
-                ORDER BY o_blast_9.score DESC
-
+	SELECT * FROM orthograph_taxa
 EOSQL
+
 
 my $dbh = DBI->connect("DBI:SQLite:$database") or die DBI::errstr;
 my $sth = $dbh->prepare($query);

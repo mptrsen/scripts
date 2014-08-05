@@ -72,13 +72,12 @@ if ($nfiles) {
 	}
 	printf "wrote %d overspill sequence(s) to file '%s'\n", $n, $fn;
 	close $outfh;
-	}
 }
 
 # split the sequences so that they result in any number of files with $nseqs sequences each
 elsif ($nseqs) {
 	my $n = 0;
-	my $fn_len = int(scalar(@$seqs) / $nseqs);
+	my $fn_len = length(int(scalar(@$seqs) / $nseqs));
 
 	while (scalar @$seqs != 0) {
 		$n++;

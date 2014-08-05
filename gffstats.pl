@@ -19,7 +19,7 @@ foreach my $inf (@ARGV) {
 
 while (my ($fn, $d) = each %$big_data_structure) {
 	print 'Statistics for ' . $fn . "\n";
-	print '---------------' . '-' x length($fn) . "\n\n";
+	print '===============' . '=' x length($fn) . "\n\n";
 	print_gff_statistics($d);
 }
 
