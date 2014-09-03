@@ -9,10 +9,16 @@ use Getopt::Long;
 
 my $skipfirst = 0;
 my $skipall   = 0;
+my $outdir    = '/tmp';
+my $exonerate = 'exonerate';
+my $score_threshold = 30;
 
 GetOptions(
-	'skipfirst' => \$skipfirst,
-	'skipall'   => \$skipall,
+	'skipfirst'         => \$skipfirst,
+	'skipall'           => \$skipall,
+	'outdir=s'          => \$outdir,
+	'exonerate=s'       => \$exonerate,
+	'score-threshold=d' => \$score_threshold,
 );
 
 my $usage = "Usage: $0 OGSFILE TRANSCRIPTOMEFILE\n";
@@ -36,14 +42,18 @@ my $n       = 0;
 my $nseqs   = scalar keys %$ogs;
 my $c       = 0;
 
-my $new_ogs_file = File::Spec->catfile('/tmp', 'corresp-' . basename($ARGV[0]));
-my $new_transcripts_file = File::Spec->catfile('/tmp', 'corresp-' . basename($ARGV[1]));
+my $new_ogs_file = File::Spec->catfile($outdir, 'corresp-' . basename($ARGV[0]));
+my $new_transcripts_file = File::Spec->catfile($outdir, 'corresp-' . basename($ARGV[1]));
 open my $new_ogs, '>', $new_ogs_file;
 open my $new_transcripts, '>', $new_transcripts_file;
 
 foreach my $hdr (sort {$a cmp $b} keys %$ogs) {
 
 	++$c;
+
+	# if the headers aren't identical, the sequences can't be correlated. 
+	# in this case, they may be skipped at the user's discretion (--skipfirst or
+	# --skipall options). otherwise, the program will exit.
 	unless (exists $transcripts->{$hdr}) {
 		if ($skipall) {
 			print "Not found in transcriptome: '$hdr', skipping\n";
@@ -59,26 +69,21 @@ foreach my $hdr (sort {$a cmp $b} keys %$ogs) {
 		}
 	}
 
-	print "Non-unique header: $hdr\n" and exit(1) if $seen{$hdr}++;
-
 	# print to files 
-	my $aafn = fastaify($hdr, $ogs->{$hdr});
-	my $ntfn = fastaify($hdr, $transcripts->{$hdr});
+	my $aafn    = fastaify($hdr, $ogs->{$hdr});
+	my $ntfn    = fastaify($hdr, $transcripts->{$hdr});
+	my $outfile = File::Temp->new();
 
-	# some settings
-	my $outfile         = File::Temp->new();
-	my $score_threshold = 30;
+	# some settings for exonerate
 	my $exonerate_model = 'protein2genome';
 	my $exonerate_ryo   = '>ca\n%tcs>qa\n%qas';
-
-	#printf ">%s\n%s\n>%s\n%s\n", $hdr . ' (query)', $ogs->{$hdr}, $hdr . ' (target)', $transcripts->{$hdr};
 
 	# set output buffer to flush immediately
 	local $| = 0;
 	print "Checking $hdr ($c of $nseqs)... ";
 	
 	# run exonerate
-	my @command = QW( "exonerate
+	my @command = QW( "$exonerate
 		--bestn 1
 		--score $score_threshold
 		--ryo '$exonerate_ryo'
@@ -95,12 +100,14 @@ foreach my $hdr (sort {$a cmp $b} keys %$ogs) {
 
 	system("@command") and die $?;
 
-	# write new sequences to file
+	# get the alignment results
 	my $res = slurp_fasta($outfile);
+	# no alignment found, something is wrong, skip this pair
 	if (!$res->{'ca'}) {
-		print "no alignment found!\n";
+		print "done, no alignment found, skipping\n";
 		next;
 	}
+	# the sequence has been updated
 	elsif ($res->{'ca'} ne $transcripts->{$hdr}) {
 		printf $new_ogs ">%s\n%s\n", $hdr, $res->{'qa'};
 		printf $new_transcripts ">%s\n%s\n", $hdr, $res->{'ca'};
@@ -108,8 +115,8 @@ foreach my $hdr (sort {$a cmp $b} keys %$ogs) {
 		++$nupd;
 		++$n;
 		print "done, updated\n";
-		
 	}
+	# the sequence is the same
 	else {
 		printf $new_ogs ">%s\n%s\n", $hdr, $res->{'qa'};
 		printf $new_transcripts ">%s\n%s\n", $hdr, $res->{'ca'};
@@ -119,8 +126,11 @@ foreach my $hdr (sort {$a cmp $b} keys %$ogs) {
 		print "done, unchanged\n";
 	}
 
-	# set output buffer back
+	# set output buffer back to normal
 	local $| = 1;
+
+	# delete tempfile
+	undef $outfile;
 }
 
 printf "Done, updated %d of %d sequences, wrote %d sequences to %s and %s\n",
@@ -156,6 +166,8 @@ sub slurp_fasta {
 		$fields[0] =~ s/-[RPT][A-H]$//;
 		# remove pipes
 		$fields[0] =~ s/\|/_/g;
+		# make sure the header is unique
+		die "Non-unique header: $fields[0]\n" if $sequences->{$fields[0]};
 		# ok you got it
 		$sequences->{$fields[0]} = $s;
 	}
@@ -165,7 +177,7 @@ sub slurp_fasta {
 
 sub QW {
 	my $s = shift;
-	$s =~ s/\n//g;
+	$s =~ s/\n/ /g;
 	return split /\s+/, $s;
 }
 
