@@ -27,7 +27,8 @@ package HelpBot;
 
 use base qw( Bot::BasicBot );
 
-my $msgcnt = 0;
+our $msgcnt = 0;
+our $today = 1;
 
 sub query {
 	$_[0] eq 'pubmed'  && return "http://www.ncbi.nlm.nih.gov/pubmed/?term=$_[1]";
@@ -35,22 +36,39 @@ sub query {
 	$_[0] eq 'perldoc' && return "http://perldoc.perl.org/search.html?q=$_[1]";
 	$_[0] eq 'wiki'    && return "http://en.wikipedia.org/w/index.php?search=$_[1]&fulltext=Search";
 	$_[0] eq 'g'       && return "https://www.google.de/search?q=$_[1]&ie=utf-8&oe=utf-8";
+	$_[0] eq 'mensa'   && return "http://www.studentenwerk-bonn.de/gastronomie/speiseplaene/diese-woche/";
 };
+
+sub help {
+	return 'I facepalm occasionally. Type "?jfgi whatever" or "?pubmed whatever" or "?perldoc whatever" or "?wiki whatever" or "?g whatever". "?mensa" and "!slap someone" also work.';
+}
 
 sub said {
 	my ($self, $msg) = @_;
 
 	$msgcnt++;
 
+	# say hi on first msg
+	my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
+	if ($today != $mday) {
+		$self->say( channel => $msg->{channel}, body => 'guten morgen zusammen!' );
+		$today = $mday;
+	}
+
 	# starts with a ?something, is a query
-	if ($msg->{body} =~ /^\?([a-zA-Z]+) (.+)/) {
+	if ($msg->{body} =~ /^\?([a-zA-Z]+)( (.+))?/) {
 		my $type  = $1;
-		my $query = $2;
+		if ($3) {
+			my $query = $3;
 
-		$query =~ s/"/%22/g;  # replace quotes with %22
-		$query =~ s/\s+/+/g;  # replace spaces with + for the query
+			$query =~ s/"/%22/g;  # replace quotes with %22
+			$query =~ s/\s+/+/g;  # replace spaces with + for the query
 
-		$self->say( channel => $msg->{channel}, body => query($type, $query) );
+			$self->reply( $msg, query($type, $query) );
+		}
+		else {
+			$self->reply( $msg, query($type) );
+		}
 	}
 
 	# starts with !slap, is a slap request
@@ -60,7 +78,7 @@ sub said {
 
 	# ends with botname?, is probably a help request
 	elsif ($msg->{body} =~ /$botname\?/i) {
-		$self->say( channel => $msg->{channel}, body => 'I facepalm occasionally. Type "?jfgi whatever" or "?pubmed whatever" or "?perldoc whatever" or "?wiki whatever" or "?g whatever". "!slap someone" also works.');
+		$self->say( channel => $msg->{channel}, body => help() );
 	}
 
 	# was addressed directly, dunno the answer
@@ -68,6 +86,7 @@ sub said {
 		$self->say( channel => $msg->{channel}, body => 'keine ahnung, ich kann doch nicht alles wissen :P' );
 	}
 
+	# someone ._.'d, comfort them
 	elsif ($msg->{body} =~ /\._\./) {
 		$self->emote( channel => $msg->{channel}, body => 'taetschelt ' . $msg->{who} . ' den kopf' );
 	}
@@ -114,5 +133,5 @@ sub random_emote {
 sub tick {
 	my $self = shift;
 	$self->say( { who => 'hannah', channel => 'msg', body => 'malte says he loves you.' } );
-	return int(rand(7200));
+	return 3600 + int(rand(7200));
 }

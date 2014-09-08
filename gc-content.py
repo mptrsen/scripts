@@ -2,13 +2,15 @@
 
 from __future__ import division
 import sys
+import os
 import re
 from decimal import *
 import fastaParser
+import fastatools
 
 #print("Call: " + " ".join(sys.argv))
 
-inf = sys.argv[-1]
+infiles = sys.argv[1:]
 
 class baseCompo:
 	"""Base composition parser"""
@@ -18,24 +20,29 @@ class baseCompo:
 
 	def gc_content(self, inf):
 		self.parse_fasta(inf)
-		
+
 	def parse_fasta(self, f):
-		print 'pos,gc'
-		fh = open(f)
-		for hdr, seq in fastaParser.parse(fh):
-			self.determine_gc(seq)
-			sys.exit()
-		fh.close()
+		db = fastatools.FastaFile(f)
+		for hdr, seq in db.next_seq():
+			gc_content = self.determine_gc(seq)
+			of = open(os.path.normpath('/var/tmp/gc/' + hdr + '.csv'), 'w')
+			of.write('pos,gc\n')
+			for l in gc_content:
+				of.write(','.join(str(x) for x in l) + '\n')
+			of.close()
 	
 	def determine_gc(self, seq):
+		gcs = [ ]
 		for i in range(0, len(seq)-self.winsize, self.winsize):
 			subs = seq[i:i+self.winsize]
 			gs = subs.count('G')
 			cs = subs.count('C')
-			print '%d,%.4f' % (i+1, (Decimal(gs) / self.winsize) + (Decimal(cs) / self.winsize))
+			gcs.append([i+1, (gs / self.winsize) + (cs / self.winsize)])
+		return(gcs)
 
 compo = baseCompo()
 
-compo.gc_content(inf)
+for inf in infiles:
+	compo.gc_content(inf)
 
 sys.exit()
