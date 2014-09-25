@@ -43,6 +43,13 @@ sub help {
 	return 'I facepalm occasionally. Type "?jfgi whatever" or "?pubmed whatever" or "?perldoc whatever" or "?wiki whatever" or "?g whatever". "?mensa" and "!slap someone" also work.';
 }
 
+sub emoted {
+	my ($self, $msg) = @_;
+	if ($msg->{body} =~ /$botname/i) {
+		$self->reply( $msg, 'wtf?' );
+	}
+}
+
 sub said {
 	my ($self, $msg) = @_;
 
@@ -50,7 +57,7 @@ sub said {
 
 	# say hi on first msg
 	my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
-	if ($today != $mday) {
+	if (!$today or $today != $mday) {
 		$self->say( channel => $msg->{channel}, body => 'guten morgen zusammen!' );
 		$today = $mday;
 	}
@@ -98,7 +105,7 @@ sub said {
 
 	# sometimes just facepalm
 	else {
-		if ($msgcnt % 20 == 0 && occasion(64)) {
+		if (occasion(128)) {
 			$self->say( channel => $msg->{channel}, body => random_emote());
 		}
 	}
@@ -117,7 +124,6 @@ sub random_slap {
 		"slaps %s around with a 500 lbs UNIX manual",
 		"beats %s over the head with the Camel book",
 	];
-
 	return $slaps->[rand @$slaps];
 }
 
