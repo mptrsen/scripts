@@ -12,7 +12,7 @@ TABLEFILE needs to have the following columns, tab-separated (X, Y and Z are irr
 
 SPECIES TYPE LIBSIZE X Y USER HOST Z PROJECT DIR FILES
 
-Lines that begin with a '#' are ignored.
+FILES is a semicolon-separated list of files. Lines that begin with a '#' are ignored.
  
 EOF
 )
@@ -38,12 +38,14 @@ grep -v '^#' $1 | cut -f 1,2,3,6,7,9,10,11 | while read SPECIES TYPE LIBSIZE USE
 
 	# split the list of files and make a link for each
 	echo $FILES | sed -e 's/;/\n/g' | while read FILE; do
-		INFILE="$USER@$HOST/$PROJECT/$DIR/Clean/$FILE"
+		LINK="$USER@$HOST/$PROJECT/$DIR/Clean/$FILE"
 		if [ ! -f $INFILE ]; then
-			die "no such file or directory: $INFILE"
+			echo die "no such file or directory: $INFILE"
 		fi
-		LINKAGE="ln -s $INFILE $OUTDIR/$FILE"
+		LINKAGE="ln -s $LINK $OUTDIR/$FILE"
 		$LINKAGE || die "failed to create link"
 	done
 done
 
+find "$PREFIX/by-species" -type f -exec chmod 444 {} \;
+find "$PREFIX/by-species" -type d -exec chmod 555 {} \;

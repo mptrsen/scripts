@@ -1,0 +1,101 @@
+#!/usr/bin/perl
+use strict;
+use warnings;
+use autodie;
+use Data::Dumper;
+use Getopt::Long;
+
+
+my $usage = "Usage: $0 GFF3FILE [OPTIONS]\n"
+	. "\n"
+	. "Options:\n"
+	. "  -h, --help                display this help\n"
+	. "  --feature <FEATURE>       extract FEATURE. Default: 'gene'; use '*' to get all features\n"
+	. "  --sequence-file <FILE>    read sequences from FASTA file FILE\n"
+;
+
+my $fastafile = '';
+my $wanted_features = 'gene';
+
+GetOptions( 'sequence-file=s' => \$fastafile, 'feature=s' => \$wanted_features ) or die $usage;
+
+my $gfffile = shift @ARGV or die $usage;
+
+# make a comma-separated list of wanted features and check if everything is wanted
+$wanted_features = [ split ',', $wanted_features ];
+my $want_all = grep({ /^\*$/ } @$wanted_features) ? 1 : 0;
+
+my $scaffolds = { };
+
+# read lines until reaching the FASTA portion
+open my $fh, '<', $gfffile or die $!;
+while (<$fh>) {
+	last if /^##FASTA/;
+	next if /^#/;
+	my @f = split /\t/;
+	last if scalar @f != 9;
+	push @{$scaffolds->{$f[0]}->{$f[2]}}, { 'start' => $f[3], 'end' => $f[4] };
+}
+
+my $id = '';
+my $sequence = '';
+
+if ($fastafile) {
+	close $fh;
+	$fh = Seqload::Fasta->open($fastafile);
+	while (my ($h, $s) = $fh->next_seq()) {
+		print_feature_seq($h, $s);
+	}
+}
+else {
+# now read the fasta portion, print the genes
+	while (<$fh>) {
+		chomp;
+		if (/^>(.+)$/) {
+			if ($id) {
+				print_feature_seq($id, $sequence);
+			}
+			# next scaffold
+			$id = $1;
+			$sequence = '';
+		}
+		else {
+			$sequence .= $_;
+		}
+	}
+}
+
+undef $fh;
+
+sub print_feature_seq {
+	my $id = shift;
+	my $seq = shift;
+	while (my ($feature, $list) = each %{$scaffolds->{$id}}) {
+		if (grep { /^$feature$/ } @$wanted_features or $want_all == 1) {
+			foreach my $coords (@$list) {
+				# if this is the case, your fasta file probably not the correct one...
+				if ($coords->{'end'} > length($seq)) {
+					printf STDERR "Warning: coordinates for '%s' (%d-%d) on %s outside of sequence. Not writing sequence\n",
+						$feature,
+						$coords->{'start'},
+						$coords->{'end'},
+						$id,
+					;
+				}
+				else {
+					printf ">%s\n%s\n",
+						$id . ':' . $feature . ':' . $coords->{'start'} . ':' . $coords->{'end'},
+						substr($seq, $coords->{'start'} - 1, $coords->{'end'} - $coords->{'start'})
+					;
+				}
+			}
+		}
+	}
+}
+
+# obfuscated fasta module
+package Seqload::Fasta;use strict;use warnings;use Carp;require Exporter;our @i=qw(Exporter);
+sub open{my($b,$a)=@_;open(my $g,'<',$a)or confess "Could not open $a: $!\n";my $d={fn=>$a,fh=>$g};bless($d,$b);return $d;}
+sub next_seq{my$d=shift;my$g=$d->{fh};local$/="\n>";return unless defined(my$c=readline($g));chomp $c;if($.==1 and $c!~/^>/){croak "".$d->{fn}." not a FASTA file: Missing descriptor line\n";}$c=~s/^>//;my($e,$f)=split(/\n/,$c,2);$e=~s/\s+$//;$f=~s/>//g if defined $f;$f=~s/\s+//g if defined $f;return($e,$f);}
+sub close{my$d=shift;my$g=$d->{fh};my$a=$d->{filename};close($g)or carp("Could not close $a\: $!\n");undef($d);}
+sub DESTROY{my$d=shift;$d->close;}1;
