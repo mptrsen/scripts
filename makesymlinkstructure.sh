@@ -2,8 +2,6 @@
 # author: Malte Petersen
 # create directory structure with symlinks according to input table
 
-# exit on any error
-set -e
 
 USAGE=$(cat <<EOF
 Usage: $0 TABLEFILE
@@ -38,14 +36,17 @@ grep -v '^#' $1 | cut -f 1,2,3,6,7,9,10,11 | while read SPECIES TYPE LIBSIZE USE
 
 	# split the list of files and make a link for each
 	echo $FILES | sed -e 's/;/\n/g' | while read FILE; do
-		LINK="$USER@$HOST/$PROJECT/$DIR/Clean/$FILE"
+		TARGET="$USER@$HOST/$PROJECT/$DIR/Clean/$FILE"
+		LINK="$OUTDIR/$FILE"
 		if [ ! -f $INFILE ]; then
-			echo die "no such file or directory: $INFILE"
+			die "no such file or directory: $INFILE"
 		fi
-		LINKAGE="ln -s $LINK $OUTDIR/$FILE"
-		$LINKAGE || die "failed to create link"
+		echo "$LINK --> $TARGET"
+		LINKAGE="ln -s $TARGET $LINK"
+		$LINKAGE
 	done
 done
 
-find "$PREFIX/by-species" -type f -exec chmod 444 {} \;
+echo "Fixing permissions"
+find "$PREFIX/by-species" -type l -exec chmod 444 {} \;
 find "$PREFIX/by-species" -type d -exec chmod 555 {} \;

@@ -37,10 +37,11 @@ sub query {
 	$_[0] eq 'wiki'    && return "http://en.wikipedia.org/w/index.php?search=$_[1]&fulltext=Search";
 	$_[0] eq 'g'       && return "https://www.google.de/search?q=$_[1]&ie=utf-8&oe=utf-8";
 	$_[0] eq 'mensa'   && return "http://www.studentenwerk-bonn.de/gastronomie/speiseplaene/diese-woche/";
+	$_[0] eq 'bistro'  && return "http://www.kartoffel-catering.de/shared/menus/57/speiseplan.doc";
 };
 
 sub help {
-	return 'I facepalm occasionally. Type "?jfgi whatever" or "?pubmed whatever" or "?perldoc whatever" or "?wiki whatever" or "?g whatever". "?mensa" and "!slap someone" also work.';
+	return 'I facepalm occasionally. Type "?jfgi whatever" or "?pubmed whatever" or "?perldoc whatever" or "?wiki whatever" or "?g whatever". "?mensa", "?bistro" and "!slap someone" also work.';
 }
 
 sub emoted {
@@ -121,7 +122,7 @@ sub random_slap {
 		"smacks %s with a MAKER bug list",
 		"whips %s with a wet noodle",
 		"threatens %s with pictures of Nicolas Cage",
-		"slaps %s around with a 500 lbs UNIX manual",
+		"punches %s with a 500 lbs UNIX manual",
 		"beats %s over the head with the Camel book",
 	];
 	return $slaps->[rand @$slaps];

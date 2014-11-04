@@ -10,7 +10,8 @@ my $usage = "Usage: $0 GFF3FILE [OPTIONS]\n"
 	. "\n"
 	. "Options:\n"
 	. "  -h, --help                display this help\n"
-	. "  --feature <FEATURE>       extract FEATURE. Default: 'gene'; use '*' to get all features\n"
+	. "  --feature <FEATURE>       extract FEATURE. Default: 'gene'; use '*' to get all features,\n"
+	. "                            or a comma-separated list of features\n"
 	. "  --sequence-file <FILE>    read sequences from FASTA file FILE\n"
 ;
 
@@ -48,7 +49,7 @@ if ($fastafile) {
 	}
 }
 else {
-# now read the fasta portion, print the genes
+# now read the fasta portion, print the features
 	while (<$fh>) {
 		chomp;
 		if (/^>(.+)$/) {
@@ -64,6 +65,8 @@ else {
 		}
 	}
 }
+# one last time for the last seq
+print_feature_seq($id, $sequence);
 
 undef $fh;
 
@@ -73,7 +76,7 @@ sub print_feature_seq {
 	while (my ($feature, $list) = each %{$scaffolds->{$id}}) {
 		if (grep { /^$feature$/ } @$wanted_features or $want_all == 1) {
 			foreach my $coords (@$list) {
-				# if this is the case, your fasta file probably not the correct one...
+				# if this is the case, your fasta file is probably not the correct one...
 				if ($coords->{'end'} > length($seq)) {
 					printf STDERR "Warning: coordinates for '%s' (%d-%d) on %s outside of sequence. Not writing sequence\n",
 						$feature,
