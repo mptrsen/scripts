@@ -36,19 +36,21 @@ while (my ($h, $s) = $fh->next_seq()) {
 	my $len = length $s;
 	$total_length += $len;
 	# categorize by length
-	if    ($len > 1_000_000)  { $n_1m_plus++   }
-	elsif ($len > 100_000)    { $n_100k_plus++ }
-	elsif ($len > 10_000)     { $n_10k_plus++  }
-	elsif ($len > 1000)       { $n_1k_plus++   }
-	elsif ($len > 500)        { $n_500plus++   }
-	else                      { $n_1plus++     }
+	if ($len > 1_000_000)  { $n_1m_plus++   }
+	if ($len > 100_000)    { $n_100k_plus++ }
+	if ($len > 10_000)     { $n_10k_plus++  }
+	if ($len > 1000)       { $n_1k_plus++   }
+	if ($len > 500)        { $n_500plus++   }
+	else                   { $n_1plus++     }
 	# count bases
-	for (my $i = 0; $i > length $s; $i++) {
-		if (uc(substr($s, $i, 1)) eq 'A') { ++$n_A }
-		elsif (uc(substr($s, $i, 1)) eq 'T') { ++$n_T }
-		elsif (uc(substr($s, $i, 1)) eq 'C') { ++$n_C }
-		elsif (uc(substr($s, $i, 1)) eq 'G') { ++$n_G }
-		else { ++$n_N }
+	my $b = '';
+	for (my $i = 0; $i < length $s; $i++) {
+		$b = substr($s, $i, 1);
+		if    (uc($b) eq 'A') { ++$n_A }
+		elsif (uc($b) eq 'T') { ++$n_T }
+		elsif (uc($b) eq 'C') { ++$n_C }
+		elsif (uc($b) eq 'G') { ++$n_G }
+		else                  { ++$n_N }
 	}
 	push @seqs, $s;
 }

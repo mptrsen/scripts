@@ -12,6 +12,8 @@ my $channel = shift @ARGV or die  "Need a channel name!\n";
 
 my $botname = 'Frida';
 
+$0 = $botname;
+
 my $bot = HelpBot->new(
 	server   => shift @ARGV || '131.220.75.133',
 	port     => 6667,
