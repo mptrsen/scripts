@@ -13,9 +13,10 @@
 	next
 }
 
-ident  = $3
-eval   = $11
-len    = $4
+{
+	ident  = $3
+	eval   = $11
+	len    = $4
 
 	# are query or target reversed?
 	if ($7 < $8) {
@@ -42,7 +43,8 @@ len    = $4
 	elsif ( s_revsd && qstart <= sstart && qend   >= send   ) { next }
 	elsif (            qstart <= send   && qend   >= sstart ) { next }
 
-# print where identity > 97% and eval < 1e-3 and len >= 100
-if ( ident > 97 && eval < 0.001 && len >= 100 ) {print}
+	# print where identity > 97% and eval < 1e-3 and len >= 100
+	if ( ident > 97 && eval < 0.001 && len >= 100 ) {print}
 
-if ( NR % 100000 == 0 ) { print "seen " NR " rows" > "/dev/stderr" }
+	if ( NR % 100000 == 0 ) { print "seen " NR " rows" > "/dev/stderr" }
+}

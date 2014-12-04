@@ -25,6 +25,7 @@ my $bot = HelpBot->new(
 
 $bot->run();
 
+
 package HelpBot;
 
 use base qw( Bot::BasicBot );
@@ -43,7 +44,7 @@ sub query {
 };
 
 sub help {
-	return 'I facepalm occasionally. Type "?jfgi whatever" or "?pubmed whatever" or "?perldoc whatever" or "?wiki whatever" or "?g whatever". "?mensa", "?bistro" and "!slap someone" also work.';
+	return 'I facepalm occasionally. Try "?jfgi whatever" or "?pubmed whatever" or "?perldoc whatever" or "?wiki whatever" or "?g whatever". "?mensa", "?bistro" and "!slap someone" also work.';
 }
 
 sub emoted {
