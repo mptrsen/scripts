@@ -62,6 +62,7 @@ sub said {
 	# say hi on first msg
 	my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
 	if (!$today or $today != $mday) {
+		sleep 1;
 		$self->say( channel => $msg->{channel}, body => 'guten morgen zusammen!' );
 		$today = $mday;
 	}
@@ -99,6 +100,7 @@ sub said {
 
 	# someone ._.'d, comfort them
 	elsif ($msg->{body} =~ /\._\./) {
+		sleep 1;
 		$self->emote( channel => $msg->{channel}, body => 'taetschelt ' . $msg->{who} . ' den kopf' );
 	}
 

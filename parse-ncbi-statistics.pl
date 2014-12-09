@@ -6,6 +6,7 @@ use File::Basename;
 
 my $d = { };
 
+# parse files and make data structure
 while (<>) {
 	s/\s*$//;
 	my $id = basename $ARGV;
@@ -24,9 +25,6 @@ while (<>) {
 		}
 	}
 }
-
-my $fmt = "%s\t" x 27;
-my $url = "ftp://ftp.ncbi.nlm.nih.gov/genomes/all/%s_%s/%s_%s_genomic.fna.gz";
 
 my @fields = (
 	'Organism name',
@@ -58,7 +56,11 @@ my @fields = (
 	'region-count',
 );
 
-printf $fmt . "%s\t", @fields, 'URL';
+# formats
+my $row = "%s\t" x scalar @fields;
+my $url = "ftp://ftp.ncbi.nlm.nih.gov/genomes/all/%s_%s/%s_%s_genomic.fna.gz";
+
+printf $row . "%s\t", @fields, 'URL';
 print "\n";
 
 while (my ($id, $props) = each %$d) {
@@ -70,7 +72,7 @@ while (my ($id, $props) = each %$d) {
 	$props->{'Shorthand'} = lc(substr($gen, 0, 1) . substr($spec, 0, 4));
 
 	# tabular output
-	printf $fmt, map { $props->{$_} || '' } @fields;
+	printf $row, map { $props->{$_} || '' } @fields;
 	
 	# also print URL
 	# special case for Locusta migratoria
