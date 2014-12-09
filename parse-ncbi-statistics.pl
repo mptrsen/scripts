@@ -57,10 +57,10 @@ my @fields = (
 );
 
 # formats
-my $row = "%s\t" x scalar @fields;
-my $url = "ftp://ftp.ncbi.nlm.nih.gov/genomes/all/%s_%s/%s_%s_genomic.fna.gz";
+my $rowfmt = "%s\t" x scalar @fields;
+my $urlfmt = "ftp://ftp.ncbi.nlm.nih.gov/genomes/all/%s_%s/%s_%s_genomic.fna.gz";
 
-printf $row . "%s\t", @fields, 'URL';
+printf $rowfmt . "%s\t", @fields, 'URL';
 print "\n";
 
 while (my ($id, $props) = each %$d) {
@@ -72,7 +72,7 @@ while (my ($id, $props) = each %$d) {
 	$props->{'Shorthand'} = lc(substr($gen, 0, 1) . substr($spec, 0, 4));
 
 	# tabular output
-	printf $row, map { $props->{$_} || '' } @fields;
+	printf $rowfmt, map { $props->{$_} || '' } @fields;
 	
 	# also print URL
 	# special case for Locusta migratoria
@@ -80,7 +80,7 @@ while (my ($id, $props) = each %$d) {
 		print 'LOCUSTA MIGRATORIA EXISTS ONLY AS A WGS PROJECT AT http://www.ncbi.nlm.nih.gov/Traces/wgs/?val=AVCP01#contigs';
 	}
 	else {
-		printf $url, $id, $props->{'Assembly Name'}, $id, $props->{'Assembly Name'};
+		printf $urlfmt, $id, $props->{'Assembly Name'}, $id, $props->{'Assembly Name'};
 	}
 	print "\n";
 }
