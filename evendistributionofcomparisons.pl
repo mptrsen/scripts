@@ -18,8 +18,7 @@ my $total  = 0;
 
 for (my $i = 0; $i < $nitems; $i++) {
 	for (my $j = 0; $j < $nitems; $j++) {
-		if ($i >= $j) { $$matrix[$i][$j] = 1; $total++ }
-		else          { $$matrix[$i][$j] = undef }
+		if ($i >= $j) { $total++ }
 	}
 }
 
@@ -48,7 +47,7 @@ for (my $i = 0; $i < $nitems; $i++) {
 	# pretty-print the matrix
 	#print $i + 1, $i < 9 ? ' | ' : '| ';
 	for (my $j = 0; $j < $nitems; $j++) {
-		if ($$matrix[$i][$j]) {
+		if ($i >= $j) {
 
 			# start a new worker if this one would be overloaded
 			if ($tasksforthisworker + 1 > $tasksperworker) {
