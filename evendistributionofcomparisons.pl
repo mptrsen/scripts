@@ -19,7 +19,7 @@ my $total  = 0;
 for (my $i = 0; $i < $nitems; $i++) {
 	for (my $j = 0; $j < $nitems; $j++) {
 		if ($i >= $j) { $$matrix[$i][$j] = 1; $total++ }
-		else          { $$matrix[$i][$j] = 0 }
+		else          { $$matrix[$i][$j] = undef }
 	}
 }
 
@@ -48,7 +48,7 @@ for (my $i = 0; $i < $nitems; $i++) {
 	# pretty-print the matrix
 	#print $i + 1, $i < 9 ? ' | ' : '| ';
 	for (my $j = 0; $j < $nitems; $j++) {
-		if ($$matrix[$i][$j] == 1) {
+		if ($$matrix[$i][$j]) {
 
 			# start a new worker if this one would be overloaded
 			if ($tasksforthisworker + 1 > $tasksperworker) {
@@ -80,10 +80,11 @@ for (my $i = 0; $i < $nitems; $i++) {
 }
 
 print "\n";
+print "number of items: $nitems\n";
 print "total tasks: $total\n";
 print "tasks per worker: $tasksperworker\n";
 print "\n";
 
 for (my $i = 0; $i < @$worker; $i++) {
-	printf "tasks for worker %d: %d - %d, %d - %d\n", $i + 1, $$worker[$i]{'imin'} + 1, $$worker[$i]{'imax'} + 1, $$worker[$i]{'jmin'} + 1, $$worker[$i]{'jmax'} + 1;
+	printf "tasks for worker %d: %d - %d %d - %d\n", $i + 1, $$worker[$i]{'imin'}, $$worker[$i]{'imax'}, $$worker[$i]{'jmin'}, $$worker[$i]{'jmax'};
 }
