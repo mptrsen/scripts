@@ -33,7 +33,7 @@ use base qw( Bot::BasicBot );
 our $msgcnt = 0;
 our $today = 1;
 
-sub query {
+sub answer {
 	$_[0] eq 'pubmed'  && return "http://www.ncbi.nlm.nih.gov/pubmed/?term=$_[1]";
 	$_[0] eq 'jfgi'    && return "jfgi... http://lmgtfy.com/?q=$_[1]";
 	$_[0] eq 'perldoc' && return "http://perldoc.perl.org/search.html?q=$_[1]";
@@ -76,10 +76,10 @@ sub said {
 			$query =~ s/"/%22/g;  # replace quotes with %22
 			$query =~ s/\s+/+/g;  # replace spaces with + for the query
 
-			$self->reply( $msg, query($type, $query) );
+			$self->reply( $msg, answer($type, $query) );
 		}
 		else {
-			$self->reply( $msg, query($type) );
+			$self->reply( $msg, answer($type) );
 		}
 	}
 
