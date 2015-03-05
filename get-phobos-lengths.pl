@@ -49,6 +49,9 @@ close $fh;
 # megabasepairs total
 my $mbp = $n / 1000000;
 
+# header line
+print "unit length,count,bp,bppmbp\n";
+
 foreach my $l (sort { $a <=> $b } keys %c) {
 	# bp per mbp
 	my $bppmbp = $bp{$l} / $mbp;

@@ -10,7 +10,7 @@ sh = function(n) {
 
 # get list of input files
 args = commandArgs()
-files = c(args[4:length(args)])
+files = c(args[6:length(args)])
 
 # list of names from filenames, using the first 4 chars
 names = lapply(files, sh)
@@ -50,8 +50,8 @@ for (name in names(plots)) {
 	par(mfrow=c(rows,cols), mar=c(5.1,4.1,8,2.1))
 
 	for (file in plots[[name]]) {
-		d = read.csv(file, header=F)
-		barplot(d$V4, names.arg=d$V1, main=label, xlab='unit length', ylab='bp/Mbp')
+		d = read.csv(file, header=T)
+		print( barplot(d$bppmbp, names.arg=d$unit.length, main=label, xlab='unit length', ylab='bp/Mbp') )
 		mtext(basename(file), line=2)
 		
 	}

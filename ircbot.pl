@@ -7,21 +7,23 @@ use Bot::BasicBot;
 
 print "Call: $0 @ARGV\n";
 
-my $server  = shift @ARGV;
-my $channel = shift @ARGV or die  "Need a channel name!\n";
+my $server  = shift @ARGV or die "Need a server name or address!\n";
+my $channel = shift @ARGV or die "Need a channel name!\n";
 
 my $botname = 'Frida';
 
 $0 = $botname;
 
 my $bot = HelpBot->new(
-	server   => shift @ARGV || '131.220.75.133',
+	server   => $server || '131.220.75.82',
 	port     => 6667,
 	nick     => $botname,
 	username => $botname,
 	name     => "Boten $botname",
 	channels => [$channel],
 );
+
+my $facts = RandomFact->new();
 
 $bot->run();
 
@@ -41,6 +43,7 @@ sub answer {
 	$_[0] eq 'g'       && return "https://www.google.de/search?q=$_[1]&ie=utf-8&oe=utf-8";
 	$_[0] eq 'mensa'   && return "http://www.studentenwerk-bonn.de/gastronomie/speiseplaene/diese-woche/";
 	$_[0] eq 'bistro'  && return "http://www.kartoffel-catering.de/shared/menus/57/speiseplan.doc";
+	return "I have no idea what you want from me."
 };
 
 sub help {
@@ -64,6 +67,8 @@ sub said {
 	if (!$today or $today != $mday) {
 		sleep 1;
 		$self->say( channel => $msg->{channel}, body => 'guten morgen zusammen!' );
+		# and update the facts list
+		$facts->update();
 		$today = $mday;
 	}
 
@@ -95,6 +100,7 @@ sub said {
 
 	# was addressed directly, dunno the answer
 	elsif ($msg->{address} and $msg->{body} =~ /\?/) {
+		sleep 1;
 		$self->say( channel => $msg->{channel}, body => 'keine ahnung, ich kann doch nicht alles wissen :P' );
 	}
 
@@ -106,19 +112,29 @@ sub said {
 
 	# contains kaffee or coffee, needs comment :D
 	elsif ($msg->{body} =~ /\b(kaffee|coffee)\b/i and occasion(2)) {
+		sleep 1;
 		$self->say( channel => $msg->{channel}, body => 'du trinkst dauernd kaffee. kannst ja auch mal den automaten saubermachen :P');
 	}
 
 	# sometimes just facepalm
 	else {
 		if (occasion(128)) {
+			sleep 1;
 			$self->say( channel => $msg->{channel}, body => random_emote());
+		}
+		elsif (occasion(129)) {
+			sleep 4;
+			$self->say( channel => $msg->{channel}, body => random_fact() );
 		}
 	}
 }
 
 sub occasion {
 	if (int(time) % $_[0] == 0) { return 1 }
+}
+
+sub random_fact {
+	return 'did you know that ' . $facts->fact() . '?';
 }
 
 sub random_slap {
@@ -146,4 +162,56 @@ sub tick {
 	my $self = shift;
 	$self->say( { who => 'hannah', channel => 'msg', body => 'malte says he loves you.' } );
 	return 3600 + int(rand(7200));
+}
+
+
+=head1 NAME
+
+RandomFact
+
+=head1 DESCRIPTION
+
+A class to get random facts of the day from uselessfacts.net.  It can download
+a fact list using an ugly curl pipeline and return a random fact at request.
+
+=head1 SYNOPSIS
+
+  my $facts = RandomFact->new()
+  print 'did you know that ', $facts->fact(), "?\n";
+
+=cut
+
+package RandomFact;
+
+sub new {
+	my $class = shift;
+	my $self  = { };
+	bless $self, $class;
+	return $self;
+}
+
+sub update {
+	my $self = shift;
+	# fetch the fact list for today
+	my @factlist = `curl -s http://uselessfacts.net/category/facts-of-the-day/ | grep -A 1 "facttext" | grep "<p>" | sed -e "s#<p>##" -e "s#</p>##"`;
+	chomp @factlist;
+	$self->{'factlist'} = \@factlist;
+	return $self->has_facts();
+}
+
+sub fact {
+	my $self = shift;
+	my $nfacts = $self->has_facts();
+	if ( not defined $nfacts) { $nfacts = $self->update() }
+	my $i = int( rand( $nfacts ) );
+	my $fact = $self->{'factlist'}->[$i];
+	$fact =~ s/^(.)/\l$1/;
+	$fact =~ s/\.$//;
+	return $fact;
+}
+
+sub has_facts {
+	my $self = shift;
+	if ( not defined $self->{'factlist'} ) { $self->update() }
+	return scalar @{$self->{'factlist'}};
 }
