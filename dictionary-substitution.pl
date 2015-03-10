@@ -21,7 +21,7 @@ open my $fh, '<', $dictf;
 
 while (<$fh>) {
 	chomp;
-	my ($k, $v) = split /\s+/;
+	my ($k, $v) = split /\t/;
 	$dict{$k} = $v;
 }
 
