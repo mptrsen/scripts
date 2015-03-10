@@ -27,7 +27,7 @@ END {
 	min = c[1]
 	max = c[1]
 	for (i in c) {
-		sqdiff += ( i - mean ) ** 2
+		sqdiff += ( c[i] - mean ) ** 2
 		if (c[i] > max) { max = c[i] }
 		if (c[i] < min) { min = c[i] }
 	}
