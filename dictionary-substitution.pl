@@ -2,12 +2,16 @@
 use strict;
 use warnings;
 use autodie;
+use Getopt::Long;
+
+my $dictf = '';
+
+GetOptions( 'f=s' => \$dictf) or die "Error in command line arguments\n";
 
 my $usage = "Replace words from a dictionary in a file\n";
 $usage   .= "Usage: $0 DICTIONARY INPUTFILE";
 
-my $dictf  = shift @ARGV or die $usage;
-my $dataf  = shift @ARGV or die $usage;
+-f $dictf or die "Fatal: Not a file: '$dictf'\n";
 
 my %dict = ( );
 
@@ -24,14 +28,10 @@ close $fh;
 my $regex = join("|", map { quotemeta } keys %dict);
 $regex = qr/$regex/;
 
-open $fh, '<', $dataf;
-
-while (my $line = <$fh>) {
+while (my $line = <>) {
 	chomp $line;
 	if ($line =~ m/\b($regex)\b/) {
 		$line =~ s/\b($regex)\b/$dict{$1}/;
 	}
 	print $line, "\n";
 }
-
-close $fh;
