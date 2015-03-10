@@ -4,12 +4,14 @@ use warnings;
 use autodie;
 use Getopt::Long;
 
-my $dictf = '';
+my $usage = "Replace words from a tab-separated dictionary in a file or standard input\n";
+$usage   .= "Usage: $0 -f DICTIONARY [INPUTFILE]";
 
-GetOptions( 'f=s' => \$dictf) or die "Error in command line arguments\n";
+my $dictf;
 
-my $usage = "Replace words from a dictionary in a file\n";
-$usage   .= "Usage: $0 DICTIONARY INPUTFILE";
+GetOptions( 'f=s' => \$dictf) or die "Error in command line arguments\n$usage\n";
+
+die "$usage\n" unless defined $dictf;
 
 -f $dictf or die "Fatal: Not a file: '$dictf'\n";
 
