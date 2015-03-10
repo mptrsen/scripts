@@ -13,7 +13,7 @@ GetOptions( 'f=s' => \$dictf) or die "Error in command line arguments\n$usage\n"
 
 die "$usage\n" unless defined $dictf;
 
--f $dictf or die "Fatal: Not a file: '$dictf'\n";
+die "Fatal: Not a file: '$dictf'\n" unless -f $dictf;
 
 my %dict = ( );
 
