@@ -3,9 +3,6 @@ use strict;
 use warnings;
 use autodie;
 use File::Spec::Functions;
-use Getopt::Long;
-use Data::Dumper;
-use Carp;
 
 my $usage = <<"__EOT__";
 
@@ -30,24 +27,10 @@ my $ntod = catdir($outdir, 'nt');
 my $aaod = catdir($outdir, 'aa');
 
 # create nt output dir unless it exists
-if (-e $ntod) {
-	if (! -d $ntod) {
-		die "Fatal: output dir $ntod exists, but is not a directory!\n";
-	}
-}
-else {
-	mkdir $ntod;
-}
+create_dir($ntod);
 
 # create aa output dir unless it exists
-if (-e $aaod) {
-	if (! -d $aaod) {
-		die "Fatal: output dir $aaod exists, but is not a directory!\n";
-	}
-}
-else {
-	mkdir $aaod;
-}
+create_dir($aaod);
 
 # directory handles
 my $aadh;
@@ -56,34 +39,62 @@ opendir $aadh, $aaind;
 opendir $ntdh, $ntind;
 
 while (my $f = readdir($aadh)) {
+
 	# skip everything but aa fasta files
 	next unless $f =~ /\.fa$/;
-	(my $basen = $f) =~ s/\.aa\.fa$//;
+	(my $basename = $f) =~ s/\.aa\.fa$//;
+
 	# the corresponding nt file must exist
-	if (!-e catfile($ntind, "$basen.nt.fa")) {
-		croak "Fatal: $aaind/$f does not exist in $ntind!\n";
+	if (!-e catfile($ntind, "$basename.nt.fa")) {
+		warn "Warning: $basename does not exist in $ntind, skipping...\n";
+		next;
 	}
+
 	# read them both in
-	my $aadata = fasta2arrayref(catfile($aaind, $basen . '.aa.fa'));
-	my $ntdata = fasta2arrayref(catfile($ntind, $basen . '.nt.fa'));
+	my $aadata = fasta2arrayref(catfile($aaind, $basename . '.aa.fa'));
+	my $ntdata = fasta2arrayref(catfile($ntind, $basename . '.nt.fa'));
 	
 	# open output files
-	open my $ntofh, '>', catfile($ntod, $basen . '.nt.fa');
-	open my $aaofh, '>', catfile($aaod, $basen . '.aa.fa');
+	open my $ntofh, '>', catfile($ntod, $basename . '.nt.fa');
+	open my $aaofh, '>', catfile($aaod, $basename . '.aa.fa');
 
 	foreach my $item (@$aadata) {
+
 		# get corresponding nt sequence
 		my $ntitem = find_sequence_for_taxon($ntdata, $item->{'tax'});
+
 		# print aa headers and aa sequences to aa output file
 		printf $aaofh ">%s\n%s\n", magic_hamstr_format($item), $item->{'seq'};
+
 		# print aa headers, but nt sequences to nt output file
 		printf $ntofh ">%s\n%s\n", magic_hamstr_format($item), $ntitem->{'seq'};
+
 	}
+
 	close $ntofh;
 	close $aaofh;
+
 }
+
 exit;
 
+# create a directory or leave it alone if it exists
+sub create_dir {
+	my $dir = shift;
+	if (-e $dir) {
+		if (! -d $dir) {
+			die "Fatal: output dir $dir exists, but is not a directory!\n";
+		}
+	}
+	else {
+		mkdir $dir;
+	}
+	return 1;
+}
+
+
+# find corresponding item in a list of items that belongs to the taxon of
+# another item
 sub find_sequence_for_taxon {
 	my $data = shift;
 	my $tax = shift;
@@ -91,10 +102,18 @@ sub find_sequence_for_taxon {
 		if ($item->{'tax'} eq $tax) { return $item }
 	}
 	# not found
-	warn "Warning: could not find nt sequence for $tax in $data->[0]->{'cog'}, leaving it empty\n";
+	warn "Warning: in $data->[0]->{'cog'}: no nucleotide sequence for $tax, leaving it empty\n";
 	return { 'seq' => '' };
 }
 
+# slurp a fasta file into fancy arrayref of hashref structure
+# arguments: filename
+# returns: arrayref of hashrefs, each having:
+#		'cog' => cog id
+#		'tax' => taxon name
+#		'hdr' => header string
+#		'seq' => sequence string
+#		'ref' => boolean, is a reftaxon or not
 sub fasta2arrayref {
 	my $f = shift;
 	my $seqs = [ ];
@@ -103,16 +122,21 @@ sub fasta2arrayref {
 		my @sectors = split /&&/, $h;
 		my @first_sector = split /\|/, $sectors[0];
 		my $is_reftaxon = $first_sector[-1] eq '.' ? 1 : 0;
-		push @$seqs, { 'tax' => $first_sector[1], 'cog' => $first_sector[0], 'hdr' => $h, 'seq' => $s, 'reftaxon' => $is_reftaxon };
+		push @$seqs, { 'tax' => $first_sector[1], 'cog' => $first_sector[0], 'hdr' => $h, 'seq' => $s, 'ref' => $is_reftaxon };
 	}
 	$fh->close();
 	return $seqs;
 }
 
+# convert a string from orthograph to hamstr format
+# arguments: hashref containing the following keys:
+#		'hdr' => header string
+#		'reftaxon' => 0 or 1
+# returns: header string in hamstr format
 sub magic_hamstr_format {
 	my $args = shift;
 	my $h = $args->{'hdr'};
-	my $is_reftaxon = $args->{'reftaxon'};
+	my $is_reftaxon = $args->{'ref'};
 	my @sectors = split /&&/, $h;
 	my @first_sector = split /\|/, $sectors[0];
 	my $hamstr_hdr = '';
@@ -138,108 +162,6 @@ sub magic_hamstr_format {
 		}
 	}
 	return $hamstr_hdr;
-}
-
-sub make_hamstr_format {
-	my $s = shift;
-	my $new = '';
-	# this is a reftaxon
-	if ($s->{'hdrs'}->[0]->{'rf'} eq '.') {
-		$new = sprintf "%s|%s|%s",
-			$s->{'cog'},
-			$s->{'tax'},
-			$s->{'hdrs'}->[0]->{'id'},
-		;
-	}
-	# is the analyzed species
-	else {
-		$new = sprintf "%s|%s|%s|%s-%d",
-			$s->{'cog'},                                  # cog id
-			$s->{'hdrs'}->[0]->{'reftax'},                 # reftaxon name
-			$s->{'tax'},                                  # taxon name
-			$s->{'hdrs'}->[0]->{'id'},                     # sequence id 
-			abs( eval($s->{'hdrs'}->[0]->{'coords'}) + 1 ), # length
-		;
-		if (scalar @{$s->{'hdrs'}} > 1) { # concatenation, add "PPsequence id - length" etc
-			for (my $i = 1; $i < scalar @{$s->{'hdrs'}}; $i++) {
-				$new .= sprintf "PP%s-%d",
-					$s->{'hdrs'}->[$i]->{'id'},                     # sequence id
-					abs( eval($s->{'hdrs'}->[$i]->{'coords'}) + 1 ), # length
-			}
-		}
-	}
-	return $new;
-}
-
-# read fasta file completely and make fancy data structure
-sub slurpfasta {
-	my $inf = shift;
-	my $seq_of = [ ];
-	my $infh = Seqload::Fasta->open($inf);
-	while (my ($h, $s) = $infh->next_seq()) {
-		my @fields = split /\|/, $h, 3;
-		my @hdrs = ( );
-		my @concats = split /&&/, $fields[2];
-		foreach my $concat (@concats) {
-			my @subfields = split /\|/, $concat;
-			push @hdrs, {
-				'id' => $subfields[0],
-				'coords' => $subfields[1],
-				'rf' => $subfields[2],
-				'reftax' => $subfields[3],
-			};
-		}
-		push @$seq_of, { 
-			'hdr'    => $h,
-			'cog'    => $fields[0],
-			'tax'    => $fields[1],
-			'hdrs'   => \@hdrs,
-		};
-	}
-	$infh->close();
-	return $seq_of;
-}
-
-sub convert_file_to_hamstr_format {
-	my $inf = shift;
-	my $infh = Seqload::Fasta->open($inf);
-	while (my ($h, $s) = $infh->next_seq()) {
-		my @fields = split(/\|/, $h, 3);
-		if ($fields[-1] =~ /\|\.\|/) { # is a reference species
-			my @idfields = split(/\|/, $fields[2]);
-			# just print the relevant fields along with the sequence
-			printf ">%s|%s|%s\n%s\n", 
-				$fields[0],   # cog id
-				$fields[1],   # reftaxon name
-				$idfields[0], # sequence id
-				$s,
-			;
-		}
-		else { # is the analyzed species
-			# concatenated headers?
-			my @concat = split(/&&/, $fields[2]);
-			my @partfields = split(/\|/, $concat[0]);
-			# print relevant fields, calculate length
-			printf ">%s|%s|%s|%s-%d",
-				$fields[0],                   # cog id,
-				$partfields[-1],              # reftaxon name
-				$fields[1],                   # taxon name
-				$partfields[0],               # sequence id 
-				abs(eval $partfields[1]) + 1, # length
-			;
-			if (scalar @concat > 1) { # concatenation, add "PPsequence id - length" etc
-				for (my $i = 1; $i < scalar @concat; $i++) {
-					@partfields = split(/\|/, $concat[$i]);
-					printf "PP%s-%d",
-						$partfields[0],               # sequence id
-						abs(eval $partfields[1]) + 1, # length
-					;
-				}
-			}
-			# and the sequence
-			printf "\n%s\n", $s;
-		}
-	}
 }
 
 package Seqload::Fasta;
