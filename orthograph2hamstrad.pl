@@ -12,7 +12,10 @@ USAGE:
 
   $0 INPUTDIRECTORY OUTPUTDIRECTORY
 
-Writes all files in INPUTDIRECTORY/aa and INPUTDIRECTORY/nt to OUTPUTDIRECTORY/aa and OUTPUTDIRECTORY/nt, respectively. Fasta headers will be corresponding.
+Writes all Fasta files in INPUTDIRECTORY/aa and INPUTDIRECTORY/nt to
+OUTPUTDIRECTORY/aa and OUTPUTDIRECTORY/nt, respectively. OUTPUTDIRECTORY
+must exist, aa and nt subdirectory will be created.
+Fasta headers will be corresponding.
 
 __EOT__
 
