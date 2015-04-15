@@ -60,12 +60,11 @@ my @fields = (
 my $rowfmt = "%s\t" x scalar @fields;
 my $urlfmt = "ftp://ftp.ncbi.nlm.nih.gov/genomes/all/%s_%s/%s_%s_genomic.fna.gz";
 
-printf $rowfmt . "%s\t", @fields, 'URL';
-print "\n";
+printf $rowfmt . "%s\n", @fields, 'URL';
 
 while (my ($id, $props) = each %$d) {
 	# remove whitespace from IDs and construct the taxon shorthand
-	$props->{'GenBank Assembly ID'} =~ s/ .+$//;
+	$props->{'GenBank Assembly ID'} =~ s/ .+$// if defined $props->{'GenBank Assembly ID'};
 	$props->{'RefSeq Assembly ID'} =~ s/ .+$// if defined $props->{'RefSeq Assembly ID'};
 	$props->{'Assembly Name'} =~ s/\s+/_/g;
 	my ($gen, $spec) = split ' ', $props->{'Organism name'}, 2;

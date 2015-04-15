@@ -42,7 +42,7 @@ sub answer {
 	$_[0] eq 'wiki'    && return "http://en.wikipedia.org/w/index.php?search=$_[1]&fulltext=Search";
 	$_[0] eq 'g'       && return "https://www.google.de/search?q=$_[1]&ie=utf-8&oe=utf-8";
 	$_[0] eq 'mensa'   && return "http://www.studentenwerk-bonn.de/gastronomie/speiseplaene/diese-woche/";
-	$_[0] eq 'bistro'  && return "http://www.kartoffel-catering.de/shared/menus/57/speiseplan.doc";
+	$_[0] eq 'bistro'  && return "http://www.kartoffel-catering.de/bistro-2/speiseplan";
 	return "I have no idea what you want from me."
 };
 
@@ -210,8 +210,16 @@ sub fact {
 	return $fact;
 }
 
+sub all_facts {
+	my $self = shift;
+	if (! $self->has_facts() ) { $self->update() }
+	return $self->{'factlist'};
+}
+
 sub has_facts {
 	my $self = shift;
 	if ( not defined $self->{'factlist'} ) { $self->update() }
 	return scalar @{$self->{'factlist'}};
 }
+
+'this line intentionally left false';
