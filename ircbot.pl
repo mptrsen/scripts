@@ -11,6 +11,7 @@ my $server  = shift @ARGV or die "Need a server name or address!\n";
 my $channel = shift @ARGV or die "Need a channel name!\n";
 
 my $botname = 'Frida';
+my $botfullname = "Boten $botname";
 
 $0 = $botname;
 
@@ -19,8 +20,8 @@ my $bot = HelpBot->new(
 	port     => 6667,
 	nick     => $botname,
 	username => $botname,
-	name     => "Boten $botname",
-	channels => [$channel],
+	name     => $botfullname,
+	channels => [ $channel ],
 );
 
 my $facts = RandomFact->new();

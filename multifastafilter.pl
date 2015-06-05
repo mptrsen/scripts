@@ -10,29 +10,25 @@ Reads a header list file and removes corresponding sequences from a fasta file.
 
 =head1 SYNOPSIS
 
-fastafilter.pl [-t] [-v] [-h] LISTFILE FASTAFILE(S)
+	fastafilter.pl [-t] [-v] [-h] LISTFILE FASTAFILE(S)
 
 =head1 OPTIONS
 
 =head2 LISTFILE 
 
-	File containing the headers to be removed from FASTAFILE (mandatory).
+File containing the headers to be removed from FASTAFILE (mandatory).
 	
 =head2 FASTAFILE(S)
 
-	Fasta file(s) to be filtered (mandatory). Directories are not supported. The filtered file will be named 'FASTAFILE.filtered'.
+Fasta file(s) to be filtered (mandatory). Directories are not supported. The filtered file will be named 'FASTAFILE.filtered'.
 
 =head2 -t 
 
-	Create a tracefile containing the sequences that were removed from FASTAFILE. The tracefile will be named after the LISTFILE and have a '.trace.fa' extension.
+Create a tracefile containing the sequences that were removed from FASTAFILE. The tracefile will be named after the FASTAFILE and have a '.trace.fa' extension.
 	
 =head2 -h 
 
-	Prints help message.
-
-=head2 -v
-
-	Verbose operation: prints more information. In essence, for every sequence in FASTAFILE.
+Prints help message.
 
 =head1 COPYRIGHT
 
@@ -61,14 +57,14 @@ my (
 	$listfile,
 	$outfile,
 	$tracefile,
-	%traceseqs,
-	$verbose,
+	$deleted_seqs,
 	@fastafiles,
+	$sum_seqs,
+	%filtered_files,
 );
 
 GetOptions(
 	'h' => \$help,
-	'v' => \$verbose,
 	't' => \$tracefile
 );
 
@@ -95,6 +91,8 @@ my $num = scalar @list;
 
 # go through all files
 foreach my $file (@fastafiles) {
+	# reset the trace sequences
+	$deleted_seqs = { };
 	my $outfh = IO::File->new(File::Spec->catfile($file . '.filtered'), 'w');
 	my $fh = Seqload::Fasta->open($file);
 	while (my ($h, $s) = $fh->next_seq()) {
@@ -103,14 +101,16 @@ foreach my $file (@fastafiles) {
 		# find in list
 		for (my $i = 0; $i < scalar @list; ++$i) {
 			if ($list[$i] eq $h) {
-				printf "'%s' (%s) removed from %s, seq #%d\n", $list[$i], $h, $file, $.;
+				printf "'%s' removed from %s, seq #%d\n", $h, $file, $.;
 				# flag for removal
 				$delete = 1;
+				$sum_seqs++;
 				last;
 			}
 		}
 		if ($delete) {
-			$traceseqs{$h} = $s;
+			$deleted_seqs->{$h} = $s;
+			$filtered_files{$file}++;
 			++$delcount;
 			$delete = 0;
 		}
@@ -118,27 +118,32 @@ foreach my $file (@fastafiles) {
 			printf $outfh "%s\n%s\n", $h, $s;
 		}
 	}
+	# write the tracefile if any sequences were deleted
+	if ($tracefile and keys %$deleted_seqs) {
+		my $tracefn = File::Spec->catfile($file . '.trace.fa');
+		hashref2fasta($deleted_seqs, $tracefn);
+		print "Wrote them to $tracefn\n";
+	}
 	$fh->close();
 	$outfh->close();
 }
 
 # done, report
 printf "found %d of %d sequences in %d files:\n",
-	scalar keys %traceseqs,
+	$sum_seqs,
 	scalar @list,
 	scalar @fastafiles;
-printf "%s\n", $_ foreach keys %traceseqs;
+printf "%d in %s\n", $filtered_files{$_}, $_ foreach keys %filtered_files;
 
-# write the tracefile
-if ($tracefile) {
-	my $tracefn = File::Spec->catfile($listfile . '.trace.fa');
-	my $tracefh = IO::File->new($tracefn, 'w');
-	foreach (keys %traceseqs) {
-		printf $tracefh ">%s\n%s\n", $_, $traceseqs{$_};
+# write the contents of a hashref in fasta format
+sub hashref2fasta {
+	my $seqs = shift;
+	my $fn = shift;
+	my $fh = IO::File->new($fn, 'w');
+	foreach (keys %$seqs) {
+		printf $fh ">%s\n%s\n", $_, $seqs->{$_};
 	}
-	undef $tracefh;
-	print "Wrote them to $tracefn\n";
-	$tracefh->close();
+	undef $fh;
 }
 
 
