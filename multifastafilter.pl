@@ -10,7 +10,7 @@ Reads a header list file and removes corresponding sequences from a fasta file.
 
 =head1 SYNOPSIS
 
-	fastafilter.pl [-t] [-v] [-h] LISTFILE FASTAFILE(S)
+	fastafilter.pl [-t] [-h] LISTFILE FASTAFILE(S)
 
 =head1 OPTIONS
 
@@ -115,7 +115,7 @@ foreach my $file (@fastafiles) {
 			$delete = 0;
 		}
 		else {
-			printf $outfh "%s\n%s\n", $h, $s;
+			printf $outfh ">%s\n%s\n", $h, $s;
 		}
 	}
 	# write the tracefile if any sequences were deleted
