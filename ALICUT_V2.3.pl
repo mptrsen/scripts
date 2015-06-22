@@ -298,7 +298,7 @@ sub start{
 		my $line = <IN> ; chomp $line ;
 		
 		# check for correct aliscore list format
-		unless ( $line =~ /^(\d+ )+\d+$|^\d+$/ ) { warn "\t!FILE-WARN!: $file has no ALISCORE list format!\n" ; next READING }
+		unless ( $line =~ /^\d+ .* ?\d+$|^\d+$/ ) { warn "\t!FILE-WARN!: $file has no ALISCORE list format!\n" ; next READING }
 		
 		# Total number of randomized identified positions
 		my @cut_positions = split " ", $line  ; close IN ;
