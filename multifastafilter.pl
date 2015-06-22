@@ -59,9 +59,10 @@ my (
 	$tracefile,
 	$deleted_seqs,
 	@fastafiles,
-	$sum_seqs,
 	%filtered_files,
 );
+
+my $sum_seqs = 0;
 
 GetOptions(
 	'h' => \$help,
