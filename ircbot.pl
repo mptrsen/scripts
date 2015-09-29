@@ -222,5 +222,3 @@ sub has_facts {
 	if ( not defined $self->{'factlist'} ) { $self->update() }
 	return scalar @{$self->{'factlist'}};
 }
-
-'this line intentionally left false';

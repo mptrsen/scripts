@@ -72,14 +72,10 @@ while (my ($id, $props) = each %$d) {
 
 	# tabular output
 	printf $rowfmt, map { $props->{$_} || '' } @fields;
-	
-	# also print URL
-	# special case for Locusta migratoria
-	if ($props->{'Shorthand'} eq 'lmigr') {
-		print 'LOCUSTA MIGRATORIA EXISTS ONLY AS A WGS PROJECT AT http://www.ncbi.nlm.nih.gov/Traces/wgs/?val=AVCP01#contigs';
-	}
-	else {
-		printf $urlfmt, $id, $props->{'Assembly Name'}, $id, $props->{'Assembly Name'};
-	}
+
+	# also construct and print URL
+	printf $urlfmt, $id, $props->{'Assembly Name'}, $id, $props->{'Assembly Name'};
+
+	# end of line
 	print "\n";
 }
