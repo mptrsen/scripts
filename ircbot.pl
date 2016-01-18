@@ -7,21 +7,24 @@ use Bot::BasicBot;
 
 print "Call: $0 @ARGV\n";
 
-my $server  = shift @ARGV or die "Need a server name or address!\n";
-my $channel = shift @ARGV or die "Need a channel name!\n";
-
 my $botname = 'Frida';
 my $botfullname = "Boten $botname";
 
 $0 = $botname;
 
+my $default_server  =  'localhost';
+my $default_channel = '#gbr';
+
+my $server  = shift @ARGV or warn "Server name or address required, falling back to $default_server\n";
+my $channel = shift @ARGV or warn "Channel name required, falling back to $default_channel\n";
+
 my $bot = HelpBot->new(
-	server   => $server || '131.220.75.82',
+	server   => $server || $default_server,
 	port     => 6667,
 	nick     => $botname,
 	username => $botname,
 	name     => $botfullname,
-	channels => [ $channel ],
+	channels => [ $channel || $default_channel ],
 );
 
 my $facts = RandomFact->new();

@@ -10,31 +10,28 @@
 }
 
 END {
-	# get median
-	Q2 = median(c)
 
-	# get upper and lower quartiles
+	# get upper and lower quartiles and median (2nd quartile)
 	Q1 = quartile(c, 1)
-	Q3 = quartile(c, 2)
+	Q2 = median(c)
+	Q3 = quartile(c, 3)
 
-	# calculate mean
-	mean = sum / NR
+
+	# determine n and calculate mean
+	n = length(c)
+	mean = sum / n
 
 	# calculate standard deviation, determine min and max
 	min = c[1]
-	max = c[1]
-	n = 0
+	max = c[length(c)]
 	for (i in c) {
-		n++
 		sqdiff += ( c[i] - mean ) ** 2
-		if (c[i] > max) { max = c[i] }
-		if (c[i] < min) { min = c[i] }
 	}
 	stdev = sqrt(sqdiff/NR)
 	N50 = n50(c)
 
 	# output
-	print "n:", n, "sum:", sum, "min:", min, "max:", max, "mean:", mean, "lower:", Q1, "median:", Q2, "upper:", Q2, "stdev:", stdev, "N50:", N50
+	print "n:", n, "sum:", sum, "min:", min, "max:", max, "mean:", mean, "lower:", Q1, "median:", Q2, "upper:", Q3, "stdev:", stdev, "N50:", N50
 }
 
 function n50(nums) {
@@ -64,24 +61,30 @@ function median(nums) {
 	else {
 		# even number of samples,
 		# median = average of the two middle values
-		return ( nums[ n/2 ] + c[ n/2 + 1 ] ) / 2
+		return ( nums[ n/2 ] + nums[ n/2 + 1 ] ) / 2
 	}
 }
 
-# slice an array
-function slice(array, start, end) {
-	j = 1
-	for (i = start; i < end; i++) {
-		tmparray[j] = array[i]
-		j++
+function quartile(nums, quart) {
+	n = length(nums)
+	if (n * quart / 4 % 2) {
+		return ( nums[ ceil( n * quart / 4 ) ] )
+	}
+	else {
+		return ( ( nums[ ceil( n * quart / 4 ) ] + nums[ floor( n * quart / 4  ) ] ) / 2)
 	}
 }
 
-# determine quartiles
-function quartile(array, quart) {
-	halfindex = length(array)/2
-	if (quart == 1) {
-		slice(array, 1, halfindex)
-		return median(tmparray)
+function ceil(x) {
+	if (x < 0) {
+		return ( x == int(x) ? x : int(x) )
 	}
+	return ( x == int(x) ? x : int(x)+1 )
+}
+
+function floor(x) {
+	if (x < 0) {
+		return ( x == int(x) ? int(x) -1 : x )
+	}
+	return ( int(x) )
 }

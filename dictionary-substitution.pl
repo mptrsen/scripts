@@ -33,7 +33,7 @@ $regex = qr/$regex/;
 while (my $line = <>) {
 	chomp $line;
 	if ($line =~ m/\b($regex)\b/) {
-		$line =~ s/\b($regex)\b/$dict{$1}/;
+		$line =~ s/\b($regex)\b/$dict{$1}/g;
 	}
 	print $line, "\n";
 }
