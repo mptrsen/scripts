@@ -2,6 +2,13 @@
 use strict;
 use warnings;
 use autodie;
+use Getopt::Long;
+
+my $species_name = '';
+
+my $opts = GetOptions(
+	'species=s' => \$species_name
+) or die;
 
 my @interestinglines;
 my $genome_size = 0;
@@ -47,5 +54,5 @@ while (<>) {
 }
 
 foreach my $line (@interestinglines) {
-	print join("\t", $file_name, $genome_size, $line->{type}, $line->{value}), "\n";
+	print join("\t", $species_name ? $species_name : $file_name, $genome_size, $line->{type}, $line->{value}), "\n";
 }
