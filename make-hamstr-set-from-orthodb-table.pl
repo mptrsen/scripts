@@ -50,8 +50,11 @@ printf $printformat, 'set name',  $setname;
 my $clusters     = parse_orthodb_table($orthodbtable);
 my $taxa         = get_taxa($clusters);
 my $ogs_file_for = parse_ogs_list($ogslist, $taxa);
+
 print_separator_line();
+
 my $ogs_for      = load_ogs($ogs_file_for);
+
 print_separator_line();
 
 # create the directories
@@ -62,6 +65,12 @@ my $set_dir        = catdir($core_orthologs, $setname); make_path($set_dir);
 my $aln_dir        = catdir($set_dir, 'aln_dir');       make_path($aln_dir);
 my $hmm_dir        = catdir($set_dir, 'hmm_dir');       make_path($hmm_dir);
 my $fafile         = catfile($set_dir, $setname . '.fa');
+
+# create the set fasta file
+print "Creating set FASTA file...\n";
+make_set_fafile($clusters, $ogs_for);
+
+print_separator_line();
 
 # create the blast dbs
 foreach my $name ( @$taxa ) {
@@ -81,8 +90,33 @@ while ( my ($og, $data_for_og) = each %$clusters ) {
 }
 
 print_separator_line();
-print "Done.\n";
+
+# remove unaligned files, logs, etc
+print "Cleaning up...\n";
+cleanup();
+
+print_separator_line();
+print "Done. Created set $setname in $set_dir.\n";
 exit;
+
+sub cleanup {
+	my @files = glob "$aln_dir/*.fa $aln_dir/*.log $hmm_dir/*.log";
+	unlink @files;
+}
+
+
+sub make_set_fafile {
+	my $clusters = shift;
+	my $ogs = shift;
+	open my $fh, '>', $fafile;
+	foreach my $og ( sort { $a cmp $b } keys %$clusters ) {
+		foreach my $tax ( sort {$a cmp $b } keys %{$clusters->{$og}} ) {
+			my $id = $clusters->{$og}->{$tax};
+			printf $fh ">%s|%s|%s\n%s\n", $og, $tax, $id, $ogs->{$tax}->{$id};
+		}
+	}
+	close $fh;
+}
 
 sub makeblastdb {
 	my $name = shift;
