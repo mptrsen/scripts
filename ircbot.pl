@@ -15,8 +15,8 @@ $0 = $botname;
 my $default_server  =  'localhost';
 my $default_channel = '#gbr';
 
-my $server  = shift @ARGV or warn "Server name or address required, falling back to $default_server\n";
-my $channel = shift @ARGV or warn "Channel name required, falling back to $default_channel\n";
+my $server  = shift @ARGV or warn "Server name or address omitted, falling back to $default_server\n";
+my $channel = shift @ARGV or warn "Channel name omitted, falling back to $default_channel\n";
 
 my $bot = HelpBot->new(
 	server   => $server || $default_server,

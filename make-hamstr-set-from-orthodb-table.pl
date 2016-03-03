@@ -16,7 +16,7 @@ USAGE: $0 [OPTIONS] <ORTHODBTABLEFILE> <OGSLIST>
 
 ORTHODBTABLEFILE must be an OrthoDB 7 formatted table.
 OGSLIST must be a tab-separated file containing one taxon name
-	and the path to the corresponding OGS file per line.
+and the path to the corresponding OGS (amino acid) file per line.
 
 Options:
 	-o <dir>, --outdir <dir>       Output directory. Defaults to "hamstr_sets".
@@ -25,13 +25,13 @@ Options:
 END_USAGE
 
 my %opts; 
-my $outdir = catdir('hamstr_sets');
-my $setname = 'new_set';
+my $outdir      = catdir('hamstr_sets');
+my $setname     = 'new_set';
 my $num_threads = 1;
 
 GetOptions( %opts,
-	'outdir|o=s' => \$outdir,
-	'setname|s=s' => \$setname,
+	'outdir|o=s'      => \$outdir,
+	'setname|s=s'     => \$setname,
 	'num-threads|n=i' => \$num_threads,
 ) or die;
 
@@ -82,11 +82,11 @@ print_separator_line();
 
 # create the HMMs
 my $n_og = scalar keys %$clusters;
-my $c = 1;
+my $c = 0;
 while ( my ($og, $data_for_og) = each %$clusters ) {
+	++$c;
 	print "($c/$n_og) Creating HMM for $og...\n";
 	make_hmm($og, $data_for_og);
-	++$c;
 }
 
 print_separator_line();
@@ -96,8 +96,13 @@ print "Cleaning up...\n";
 cleanup();
 
 print_separator_line();
-print "Done. Created set $setname in $set_dir.\n";
+
+printf "Done. Created set '%s' (%d taxa, %d HMMs) in %s.\n", $setname, scalar keys %$ogs_file_for, $c, $outdir;
 exit;
+
+#---------------------------------------------------------------------------
+# Subroutines
+#---------------------------------------------------------------------------
 
 sub cleanup {
 	my @files = glob "$aln_dir/*.fa $aln_dir/*.log $hmm_dir/*.log";
