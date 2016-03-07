@@ -7,8 +7,8 @@ OLDERLOGFILE=${LOGFILE}.2
 mv $OLDLOGFILE $OLDERLOGFILE
 mv $LOGFILE $OLDLOGFILE
 
-SOURCE="/mnt/MYBOOK_A/"
-DEST="/mnt/MYBOOK_B/"
+SOURCE="/mnt/MYBOOK_A"
+DEST="/mnt/MYBOOK_B"
 
 # mount the destination
 mount $DEST
@@ -16,8 +16,15 @@ mount $DEST
 # set options
 OPTIONS="-v --archive --update --hard-links --delete --log-file=$LOGFILE"
 
+# copy irclogs
+rsync -auv --delete --log-file=$LOGFILE ~/irclogs/ $SOURCE/irclogs/
+
+# copy dropbox and sciebo contents
+rsync -auv --log-file=$LOGRILE ~/Dropbox/ $SOURCE/dropbox-local/
+rsync -auv --log-file=$LOGRILE ~/Sciebo/ $SOURCE/sciebo-local/
+
 # synchronize locations A and B
-rsync $OPTIONS $SOURCE $DEST
+rsync $OPTIONS $SOURCE/ $DEST/
 
 if (($? > 0)); then
 	ERROR=$?
