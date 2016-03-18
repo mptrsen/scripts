@@ -27,13 +27,13 @@ BED=$1
 GENOME=$2
 PHOBOS=$3
 
-if [ ! -f $BED ]; then echo "No such file: $BED"; exit 1; fi
+if [ ! -f $BED    ]; then echo "No such file: $BED"; exit 1; fi
 if [ ! -f $GENOME ]; then echo "No such file: $GENOME"; exit 1; fi
 if [ ! -f $PHOBOS ]; then echo "No such file: $PHOBOS"; exit 1; fi
 
 BASEN=$(basename $BED .bed)
 LENGTHS=$(basename $GENOME).lengths
-OVERLAPNAME="$BASEN-phobos-overlapwith-maker-models-intergenic+introns+cds"
+OVERLAPNAME="$BASEN-phobos-overlapwith-maker-models-intergenic+introns+exons"
 TEMPLATE="/home/mpetersen/data/repeats/phobos-analyses/i5k/1-51ms12mm5id5imp/statistics/statistics-template.R"
 
 # get sequence lengths from the genome
@@ -64,10 +64,13 @@ grep '\(exon\|CDS\)' $BED \
 grep 'CDS' $BED \
 	| cut -f1-6,8-99 \
 	> $BASEN-cds.bed
+awk '$8 == "exon"' $BED \
+	| cut -f1-6,8-99 \
+	> $BASEN-exons.bed
 
 # finally bring the files together to infer introns
 echo "# inferring introns..."
-cat $BASEN-cds.bed $BASEN-intergenic.bed \
+cat $BASEN-exons.bed $BASEN-intergenic.bed \
 	| cut -f1-7 \
 	| sort-bed - \
 	| bedtools complement -i - -g $LENGTHS \
@@ -75,13 +78,13 @@ cat $BASEN-cds.bed $BASEN-intergenic.bed \
 	> $BASEN-introns.bed
 
 echo "# combining all features..."
-cat $BASEN-cds.bed $BASEN-intergenic.bed $BASEN-introns.bed \
+cat $BASEN-exons.bed $BASEN-intergenic.bed $BASEN-introns.bed \
 	| cut -f1-7 \
 	| sort-bed - \
-	> $BASEN-cds+introns+intergenic.bed
+	> $BASEN-exons+introns+intergenic.bed
 
 echo "# intersecting with Phobos result..."
-bedtools intersect -a $PHOBOS -b $BASEN-cds+introns+intergenic.bed -wo \
+bedtools intersect -a $PHOBOS -b $BASEN-exons+introns+intergenic.bed -wo \
 	| cut -f1-3,7,9,11-12,15-17 \
 	> ${OVERLAPNAME}.bed
 

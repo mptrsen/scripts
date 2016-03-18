@@ -3,12 +3,14 @@
 # get the latest search results from NCBI PubMed for a list of queries,
 # mail them to me
 
-QUERIES="transposable+element"
+QUERIES="transposable+element transposon"
 SMTP="smtp=smtp.uni-bonn.de"
 FROMADDR="mptrsen@uni-bonn.de"
 TOADDR="mptrsen@uni-bonn.de"
 AGE=7
 OUTDIR="/var/tmp/pubmed-results"
+EFETCH="/home/mpetersen/local/bin/efetch"
+ESEARCH="/home/mpetersen/local/bin/esearch"
 
 # create output directory
 mkdir -p $OUTDIR
@@ -18,7 +20,7 @@ for QUERY in $QUERIES; do
 
 	# fetch the search results to file
 	FILE="$OUTDIR/$QUERY.txt"
-	esearch -db pubmed -query "$QUERY" -days $AGE | efetch > $FILE 2>&1
+	$ESEARCH -db pubmed -query "$QUERY" -days $AGE | $EFETCH > $FILE 2>&1
 
 	# make a pubmed URL from the PMID
 	sed -i -e 's#PMID: #http://www.ncbi.nlm.nih.gov/pubmed/#' $FILE

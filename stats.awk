@@ -10,12 +10,13 @@
 }
 
 END {
-
+	
 	# get upper and lower quartiles and median (2nd quartile)
-	Q1 = quartile(c, 1)
-	Q2 = median(c)
-	Q3 = quartile(c, 3)
-
+	Q0 = quantile(c, 0)
+	Q1 = quantile(c, 1)
+	Q2 = quantile(c, 2)
+	Q3 = quantile(c, 3)
+	Q4 = quantile(c, 4)
 
 	# determine n and calculate mean
 	n = length(c)
@@ -31,7 +32,7 @@ END {
 	N50 = n50(c)
 
 	# output
-	print "n:", n, "sum:", sum, "min:", min, "max:", max, "mean:", mean, "lower:", Q1, "median:", Q2, "upper:", Q3, "stdev:", stdev, "N50:", N50
+	print "n:", n, "sum:", sum, "min:", Q0, "max:", Q4, "mean:", mean, "lower:", Q1, "median:", Q2, "upper:", Q3, "stdev:", stdev, "N50:", N50
 }
 
 function n50(nums) {
@@ -52,6 +53,7 @@ function n50(nums) {
 
 # determine median
 function median(nums) {
+	return quantile(nums, 2)
 	n = length(nums)
 	if (n % 2) {
 		# odd number of samples,
@@ -65,26 +67,11 @@ function median(nums) {
 	}
 }
 
-function quartile(nums, quart) {
-	n = length(nums)
-	if (n * quart / 4 % 2) {
-		return ( nums[ ceil( n * quart / 4 ) ] )
-	}
-	else {
-		return ( ( nums[ ceil( n * quart / 4 ) ] + nums[ floor( n * quart / 4  ) ] ) / 2)
-	}
-}
-
-function ceil(x) {
-	if (x < 0) {
-		return ( x == int(x) ? x : int(x) )
-	}
-	return ( x == int(x) ? x : int(x)+1 )
-}
-
-function floor(x) {
-	if (x < 0) {
-		return ( x == int(x) ? int(x) -1 : x )
-	}
-	return ( int(x) )
+function quantile(nums, p) {
+	q = p/4
+	l = length(nums)
+	t = (l-1)*q+1 # our array is one-based
+	v = nums[ int(t) ]
+	if (t > int(t)) { return v + q * (nums[ int(t) + 1 ] - v) }
+	else            { return v }
 }
