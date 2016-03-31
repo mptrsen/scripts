@@ -17,7 +17,6 @@
 
 echo "Binary classification statistics calculator"
 echo "Written in 2016 by Malte Petersen"
-echo ""
 
 if [ $# != 4 ]; then
 	echo "USAGE: $0 TOTAL_POPULATION MAX_POSSIBLE_TRUE_POSITIVES POSITIVES FALSE_POSITIVES"
@@ -32,23 +31,19 @@ TRUE_POSITIVES=$(( $POSITIVES - $FALSE_POSITIVES ))
 FALSE_NEGATIVES=$(( $MAX_POSSIBLE_TRUE_POSITIVES - $TRUE_POSITIVES ))
 TRUE_NEGATIVES=$(( $TOTAL_POPULATION - $FALSE_POSITIVES - $TRUE_POSITIVES - $FALSE_NEGATIVES ))
 
-echo ''
-
+echo
 echo "Selected $POSITIVES ($FALSE_POSITIVES false positives)"
 echo "out of $MAX_POSSIBLE_TRUE_POSITIVES from population of $TOTAL_POPULATION"
-
-echo ''
-
+echo
 echo "True positives: " $TRUE_POSITIVES
 echo "False positives:" $FALSE_POSITIVES
 echo "True negatives: " $TRUE_NEGATIVES
 echo "False negatives:" $FALSE_NEGATIVES
-
-echo ''
+echo
 
 bc <<END
 scale=5
-accuracy  = ( $TRUE_POSITIVES + $TRUE_NEGATIVES ) / $TOTAL_POPULATION
+accuracy    = ( $TRUE_POSITIVES + $TRUE_NEGATIVES ) / $TOTAL_POPULATION
 sensitivity = $TRUE_POSITIVES / ( $TRUE_POSITIVES + $FALSE_NEGATIVES )
 specificity = $TRUE_NEGATIVES / ( $TRUE_NEGATIVES + $FALSE_POSITIVES )
 precision   = $TRUE_POSITIVES / ( $TRUE_POSITIVES + $FALSE_POSITIVES )
@@ -58,4 +53,4 @@ print "Specificity: ", specificity, "\n"
 print "Precision:   ", precision, "\n"
 END
 
-echo ''
+echo

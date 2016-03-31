@@ -67,6 +67,7 @@ function median(nums) {
 	}
 }
 
+# determine distribution quantiles (0 = min, 4 = max)
 function quantile(nums, p) {
 	q = p/4
 	l = length(nums)
