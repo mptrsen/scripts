@@ -20,15 +20,15 @@ rsync -avrPe ssh $GBR_LOCATION/data/.store/ $ZMB_LOCATION/data/.store/
 
 # the shared pool directory
 echo "#"
-echo "# Backup of $GBR_LOCATION/data/pool"
+echo "# Backup of $GBR_LOCATION/pool"
 echo "#"
 rsync -avrPe ssh $GBR_LOCATION/pool/ $ZMB_LOCATION/pool/
 
 # scripts that do this and that
 echo "#"
-echo "# Backup of $GBR_LOCATION/data/scripts"
+echo "# Backup of $GBR_LOCATION/tools"
 echo "#"
-rsync -avrPe ssh $GBR_LOCATION/scripts/ $ZMB_LOCATION/scripts/ 
+rsync -avrPe ssh $GBR_LOCATION/tools/ $ZMB_LOCATION/tools/ 
 
 # webapollo data
 echo "#"
@@ -40,4 +40,4 @@ rsync -avrPe ssh $APOLLO_LOCATION/ $ZMB_LOCATION/apollo/
 echo "#"
 echo "# Backup of $MYSQL_LOCATION"
 echo "#"
-rsync -avrPe ssh --delete $MYSQL_LOCATION/ $ZMB_LOCATION/mysql/wiki-backup/
+rsync -avrPe ssh --delete $MYSQL_LOCATION/ $ZMB_LOCATION/wiki-backup/

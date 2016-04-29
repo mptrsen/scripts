@@ -12,7 +12,7 @@ my $botfullname = "Boten $botname";
 
 $0 = $botname;
 
-my $default_server  =  'localhost';
+my $default_server  =  '131.220.75.153';
 my $default_channel = '#gbr';
 
 my $server  = shift @ARGV or warn "Server name or address omitted, falling back to $default_server\n";
