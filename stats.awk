@@ -32,7 +32,8 @@ END {
 	N50 = n50(c)
 
 	# output
-	print "n:", n, "sum:", sum, "min:", Q0, "max:", Q4, "mean:", mean, "lower:", Q1, "median:", Q2, "upper:", Q3, "stdev:", stdev, "N50:", N50
+	printf("%-12s %-12s %-12s %-12s %-12s %-12s %-12s %-12s %-12s %-12s\n", "n", "sum", "min", "lower", "mean", "median", "upper", "max", "stdev", "N50")
+	printf("%-12d %-12f %-12f %-12f %-12f %-12f %-12f %-12f %-12f %-12f\n", n, sum, Q0, Q1, mean, Q2, Q3, Q4, stdev, N50)
 }
 
 function n50(nums) {
