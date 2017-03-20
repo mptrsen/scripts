@@ -16,6 +16,7 @@
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 set -e
+set -o pipefail
 
 # need 3 arguments: annotation BED, genome assembly the annotation is based on, and Phobos result as BED file
 if [ $# -ne 3 ]; then
@@ -27,14 +28,19 @@ BED=$1
 GENOME=$2
 PHOBOS=$3
 
-if [ ! -f $BED    ]; then echo "No such file: $BED"; exit 1; fi
+BASEN=$(basename $BED .bed)-noN
+OUTDIR=results/genome-features
+OUTFILE=$OUTDIR/$BASEN
+LENGTHS=results/genome-features/$(basename $GENOME).lengths
+OVERLAPNAME=results/genome-features/"$BASEN-phobos-overlapwith-maker-models-intergenic+introns+cds"
+TEMPLATE="code/statistics-template.R"
+NEXTRACTOR="code/fasta-gff-v1.0-dist/fasta-gff" # the most non-portable part of this script :/
+
+if [ ! -f $BED    ]; then echo "No such file: $BED";    exit 1; fi
 if [ ! -f $GENOME ]; then echo "No such file: $GENOME"; exit 1; fi
 if [ ! -f $PHOBOS ]; then echo "No such file: $PHOBOS"; exit 1; fi
 
-BASEN=$(basename $BED .bed)
-LENGTHS=$(basename $GENOME).lengths
-OVERLAPNAME="$BASEN-phobos-overlapwith-maker-models-intergenic+introns+exons"
-TEMPLATE="/home/mpetersen/data/repeats/phobos-analyses/i5k/1-51ms12mm5id5imp/statistics/statistics-template.R"
+if [ ! -f $NEXTRACTOR ]; then echo "N-extractor not found: $NEXTRACTOR"; exit 1; fi
 
 # get sequence lengths from the genome
 echo "# getting sequence lengths..."
@@ -44,52 +50,68 @@ fastalength $GENOME | awk '{ print $2 "\t" $1 }' > $LENGTHS || exit 1
 echo "# calculating genome assembly size..."
 GENOME_LENGTH=$(awk '{ s += $2 } END { print s }' $LENGTHS)
 
+# use Christoph's tool to make a GFF of N positions
+echo "# extracting Ns..."
+$NEXTRACTOR $GENOME /dev/null $GENOME-Ns.gff
+gff2bed < $GENOME-Ns.gff > $OUTFILE-Ns.bed
+
+echo "# subtracting Ns from all features..."
+bedtools subtract -a $BED -b $OUTFILE-Ns.bed | sortBed > $OUTFILE.bed
+
+echo "# calculating total feature sizes..."
+echo "feature	feature.size" > $OUTFILE-feature-sizes.txt
+awk '{ s[$8] += $3 - $2 } END { for (f in s) { printf("%s\t%d\n", f, s[f]) } }' $OUTFILE.bed >> $OUTFILE-feature-sizes.txt
+
 # get genes from the annotation
 echo "# extracting genes..."
-grep -P "\tgene\t" $BED \
-	| cut -f1-6,8-99 > $BASEN-genes.bed
+grep -P "\tgene\t" $OUTFILE.bed \
+	| cut -f1-6,8-99 > $OUTFILE-genes.bed
 
 # get intergenic regions
 echo "# inferring intergenic regions..."
-bedtools complement -i $BASEN-genes.bed -g $LENGTHS \
+bedtools complement -i $OUTFILE-genes.bed -g $LENGTHS \
 	| awk 'BEGIN { OFS="\t" } { print $1, $2, $3, $1 ":" $2 "-" $3, ".", ".", "intergenic" }' \
-	> $BASEN-intergenic.bed 
+	> $OUTFILE-intergenic.bed 
+awk '{ s += $3 - $2 } END { printf("intergenic\t%d\n", s) }' $OUTFILE-intergenic.bed >> $OUTFILE-feature-sizes.txt
 
 # get exons and CDS
-echo "# extracting exons and CDS..."
-grep '\(exon\|CDS\)' $BED \
+echo "# extracting CDS..."
+awk '$8 == "CDS" || $8 == "exon"' $OUTFILE.bed \
 	| bedtools merge -s \
 	| awk 'BEGIN { OFS="\t" } { print $1, $2, $3, $1 ":" $2 "-" $3, ".", ".", "CDS" }' \
-	> $BASEN-exons+cds-merged.bed
-grep 'CDS' $BED \
+	> $OUTFILE-exons+cds-merged.bed
+awk '$8 == "CDS"' $OUTFILE.bed \
 	| cut -f1-6,8-99 \
-	> $BASEN-cds.bed
-awk '$8 == "exon"' $BED \
+	> $OUTFILE-cds.bed
+
+echo "# extracting exons..."
+awk '$8 == "exon"' $OUTFILE.bed \
 	| cut -f1-6,8-99 \
-	> $BASEN-exons.bed
+	> $OUTFILE-exons.bed
 
 # finally bring the files together to infer introns
 echo "# inferring introns..."
-cat $BASEN-exons.bed $BASEN-intergenic.bed \
+cat $OUTFILE-exons.bed $OUTFILE-intergenic.bed \
 	| cut -f1-7 \
-	| sort-bed - \
+	| sortBed \
 	| bedtools complement -i - -g $LENGTHS \
 	| awk 'BEGIN { OFS="\t" } { print $1, $2, $3, $1 ":" $2 "-" $3, ".", ".", "intron" }' \
-	> $BASEN-introns.bed
+	> $OUTFILE-introns.bed
+awk '{ s += $3 - $2 } END { printf("intron\t%d\n", s) }' $OUTFILE-introns.bed >> $OUTFILE-feature-sizes.txt
 
 echo "# combining all features..."
-cat $BASEN-exons.bed $BASEN-intergenic.bed $BASEN-introns.bed \
+cat $OUTFILE-cds.bed $OUTFILE-intergenic.bed $OUTFILE-introns.bed \
 	| cut -f1-7 \
-	| sort-bed - \
-	> $BASEN-exons+introns+intergenic.bed
+	| sortBed \
+	> $OUTFILE-cds+introns+intergenic.bed
 
 echo "# intersecting with Phobos result..."
-bedtools intersect -a $PHOBOS -b $BASEN-exons+introns+intergenic.bed -wo \
+bedtools intersect -a $PHOBOS -b $OUTFILE-cds+introns+intergenic.bed -wo \
 	| cut -f1-3,7,9,11-12,15-17 \
 	> ${OVERLAPNAME}.bed
 
 # convert the BED file to a sensible table for R to read in
-echo "# generating table for statistics..."
+echo "# formatting table for statistics..."
 echo "query.sequence	repeat.start	repeat.end	repeat.type	unit.size	repeat.number	perfection	unit	feature.start	feature.end	feature.strand	feature	overlap" \
 	> $OVERLAPNAME-table-for-R.tsv
 sed -e 's/Name="repeat_region [0-9]\+-[0-9]\+ unit_size //' \
@@ -102,5 +124,6 @@ sed -e 's/Name="repeat_region [0-9]\+-[0-9]\+ unit_size //' \
 echo "# making plots and calculating statistics..."
 sed -e "s#INPUTFILE#$OVERLAPNAME-table-for-R.tsv#" \
 	-e "s/SIZE/$GENOME_LENGTH/" \
-	$TEMPLATE \
-	| R --no-save --slave > statistics-${BASEN}.txt
+	-e "s#FEATURELENGTHFILE#$OUTFILE-feature-sizes.txt#" \
+	$TEMPLATE > $OUTDIR/statistics-${BASEN}.R 
+	R --no-save --slave < $OUTDIR/statistics-${BASEN}.R > $OUTDIR/statistics-${BASEN}.txt

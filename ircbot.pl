@@ -12,7 +12,7 @@ my $botfullname = "Boten $botname";
 
 $0 = $botname;
 
-my $default_server  =  '131.220.75.153';
+my $default_server  =  'localhost';
 my $default_channel = '#gbr';
 
 my $server  = shift @ARGV or warn "Server name or address omitted, falling back to $default_server\n";
@@ -28,6 +28,11 @@ my $bot = HelpBot->new(
 );
 
 my $facts = RandomFact->new();
+
+print "Fact list for today:\n";
+for (my $i = 0; $i < $facts->num_facts(); $i++) {
+	printf "[%2d] %s\n", $i, $facts->all_facts->[$i];
+}
 
 $bot->run();
 
@@ -46,7 +51,7 @@ sub answer {
 	$_[0] eq 'wiki'    && return "http://en.wikipedia.org/w/index.php?search=$_[1]&fulltext=Search";
 	$_[0] eq 'g'       && return "https://www.google.de/search?q=$_[1]&ie=utf-8&oe=utf-8";
 	$_[0] eq 'mensa'   && return "http://www.studentenwerk-bonn.de/gastronomie/speiseplaene/diese-woche/";
-	$_[0] eq 'bistro'  && return "http://www.kartoffel-catering.de/bistro-2/speiseplan";
+	$_[0] eq 'bistro'  && return "http://kartoffel-catering.de/bistro-2/speiseplan";
 	return "I have no idea what you want from me."
 };
 
@@ -120,7 +125,7 @@ sub said {
 		$self->say( channel => $msg->{channel}, body => 'du trinkst dauernd kaffee. kannst ja auch mal den automaten saubermachen :P');
 	}
 
-	# sometimes just facepalm
+	# sometimes just facepalm or throw in a random fact
 	else {
 		if (occasion(128)) {
 			sleep 1;
@@ -175,7 +180,7 @@ RandomFact
 
 =head1 DESCRIPTION
 
-A class to get random facts of the day from uselessfacts.net.  It can download
+A class to get random facts of the day from facts.net.  It can download
 a fact list using an ugly curl pipeline and return a random fact at request.
 
 =head1 SYNOPSIS
@@ -188,40 +193,59 @@ a fact list using an ugly curl pipeline and return a random fact at request.
 package RandomFact;
 
 sub new {
-	my $class = shift;
-	my $self  = { };
-	bless $self, $class;
-	return $self;
+        my $class = shift;
+        my $nfacts = 10;
+        $nfacts = @_ ? shift : $nfacts;
+        my $self  = { 'nfacts' => $nfacts };
+        bless $self, $class;
+        $self->update($nfacts);
+        return $self;
+}
+
+sub num_facts {
+        my $self = shift;
+        if (@_) { $self->{'nfacts'} = shift }
+        return $self->{'nfacts'};
 }
 
 sub update {
-	my $self = shift;
-	# fetch the fact list for today
-	my @factlist = `curl -s http://uselessfacts.net/category/facts-of-the-day/ | grep -A 1 "facttext" | grep "<p>" | sed -e "s#<p>##" -e "s#</p>##"`;
-	chomp @factlist;
-	$self->{'factlist'} = \@factlist;
-	return $self->has_facts();
+        my $self = shift;
+        # fetch the fact list for today
+        my @factlist = ( );
+        for (my $i = 0; $i < $self->num_facts(); $i++) {
+                my $fact = `curl -s http://facts.net/my-random/ | grep 'portfolio-box-content'`;
+                # remove trailing newline
+                chomp $fact;
+                # remove tags
+                $fact =~ s|^.+<p>||;
+                $fact =~ s|\.?</p>$||;
+                # lower-case the first letter
+                $fact =~ s/^(.)/\l$1/;
+                # remove trailing dot
+                $fact =~ s/\.$//;
+                push @factlist, $fact;
+        }
+        $self->{'factlist'} = \@factlist;
+        return $self->has_facts();
 }
 
 sub fact {
-	my $self = shift;
-	my $nfacts = $self->has_facts();
-	if ( not defined $nfacts) { $nfacts = $self->update() }
-	my $i = int( rand( $nfacts ) );
-	my $fact = $self->{'factlist'}->[$i];
-	$fact =~ s/^(.)/\l$1/;
-	$fact =~ s/\.$//;
-	return $fact;
+        my $self = shift;
+        my $nfacts = $self->has_facts();
+        if ( not defined $nfacts) { $nfacts = $self->update() }
+        my $i = int( rand( $nfacts ) );
+        my $fact = $self->all_facts->[$i];
+        return $fact;
 }
 
 sub all_facts {
-	my $self = shift;
-	if (! $self->has_facts() ) { $self->update() }
-	return $self->{'factlist'};
+        my $self = shift;
+        if (! $self->has_facts() ) { $self->update() }
+        return $self->{'factlist'};
 }
 
 sub has_facts {
-	my $self = shift;
-	if ( not defined $self->{'factlist'} ) { $self->update() }
-	return scalar @{$self->{'factlist'}};
+        my $self = shift;
+        unless ( $self->{'factlist'} ) { $self->update() }
+        return scalar @{$self->{'factlist'}};
 }

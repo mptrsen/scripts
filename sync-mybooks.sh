@@ -14,32 +14,37 @@ DEST="/mnt/MYBOOK_B"
 mount $DEST
 
 # set options
-OPTIONS="-v --archive --update --hard-links --delete --log-file=$LOGFILE"
+OPTIONS="-v --archive --update --delete --log-file=$LOGFILE"
+
+# log function, writes everything to LOGFILE
+function log() {
+	echo "$@" >> $LOGFILE
+}
 
 # copy irclogs
-echo "## Backing up irclogs"
+log "## Backing up irclogs"
 rsync -auv --delete --log-file=$LOGFILE ~/irclogs/ $SOURCE/irclogs/
-echo
+log
 
 # copy dropbox and sciebo contents
-echo "## Backing up Dropbox"
+log "## Backing up Dropbox"
 rsync -auv --log-file=$LOGRILE ~/Dropbox/ $SOURCE/dropbox-local/
-echo
-echo "## Backing up Sciebo"
+log
+log "## Backing up Sciebo"
 rsync -auv --log-file=$LOGRILE ~/Sciebo/ $SOURCE/sciebo-local/
-echo
+log
 
 # synchronize locations A and B
 for DIR in $(ls --color=no $SOURCE | grep -v '^lost+found$'); do
-	echo "## Synchronizing $SOURCE/$DIR and $DEST/$DIR"
+	log "## Synchronizing $SOURCE/$DIR and $DEST/$DIR"
 	rsync $OPTIONS "$SOURCE/$DIR/" "$DEST/$DIR/"
-	echo
+	log
 done
 
 if (($? > 0)); then
 	ERROR=$?
-	echo "###" >> $LOGFILE
-	echo "done, errors occurred" >> $LOGFILE
+	log "###"
+	log "done, errors occurred"
 else
 	ERROR=0
 fi
