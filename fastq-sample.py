@@ -2,7 +2,7 @@
 
 """
 Randomly downsample a read library to a fraction of its original size
-Input must be gzipped FASTQ format
+Input must be gzipped or bzipped FASTQ format
 """
 
 from __future__ import division
@@ -10,6 +10,7 @@ import sys
 import time
 import random
 import gzip
+import bz2
 import argparse
 
 argparser = argparse.ArgumentParser()
@@ -19,11 +20,9 @@ argparser.add_argument("-p", type=float, default=0.01, help="Percent of reads to
 argparser.add_argument("-s", type=int, help="Set the random seed (integer)")
 args = argparser.parse_args()
 
-percent = 0.1
+percent = float(args.p)
 
-if not args.infile.endswith(".gz"): sys.exit("error: input file must be gzipped fastq")
-
-if args.p: percent = float(args.p)
+if not args.infile.endswith(".gz") and not args.infile.endswith(".bz2"): sys.exit("error: input file must be gzipped or bzipped fastq (ending in .gz or .bz2)")
 
 if args.s:
 	seed = int(args.s)
@@ -36,14 +35,27 @@ print("sampling %.01f percent of the reads" % float(percent * 100))
 
 random.seed(seed)
 
-with gzip.open(args.infile, 'rt') as input:
-    with gzip.open(args.outfile, 'wt') as output:
-        for line1 in input:
-            line2 = next(input)
-            line3 = next(input)
-            line4 = next(input)
-            if random.random() <= percent:
-                output.write(line1)
-                output.write(line2)
-                output.write(line3)
-                output.write(line4)
+INPUT = ""
+
+if args.infile.endswith(".gz"):
+    try:
+        INPUT = gzip.open(args.infile, 'rt')
+    except:
+        sys.exit("Fatal: could not open " + str(args.infile))
+
+elif args.infile.endswith(".bz2"):
+    try:
+        INPUT = bz2.open(args.infile, 'rt')
+    except:
+        sys.exit("Fatal: could not open " + str(args.infile))
+
+with gzip.open(args.outfile, 'wt') as OUTPUT:
+    for line1 in INPUT:
+        line2 = next(INPUT)
+        line3 = next(INPUT)
+        line4 = next(INPUT)
+        if random.random() <= percent:
+            OUTPUT.write(line1)
+            OUTPUT.write(line2)
+            OUTPUT.write(line3)
+            OUTPUT.write(line4)
