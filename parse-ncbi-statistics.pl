@@ -1,13 +1,13 @@
 #!/usr/bin/perl
-use strict;
-use warnings;
-use autodie;
-use File::Basename;
 
 # Parse NCBI assembly statistics files and produce a tab-separated table
 # Input: text files from NCBI
 # Output: tab-separated table (on stdout)
 
+use strict;
+use warnings;
+use autodie;
+use File::Basename;
 
 # the data structure will be a hash of hashes, with the primary key being the
 # assembly accession; secondary keys will be assembly metadata and properties
@@ -16,24 +16,24 @@ my $d = { };
 # parse files and make data structure
 while (<>) {
 	s/\s*$//; # remove trailing whitespace
-	my $id = basename $ARGV; # construct ID from file name
-	$id =~ s/_assembly_stats\.txt$//; # remove file name suffix from ID
+	my $acc = basename $ARGV; # take accession number from file name
+	$acc =~ s/_assembly_stats\.txt$//; # remove file name suffix from accession
 	if (/^#/) { # assembly metadata: IDs, name, submitter, method, etc.
 		if (/: /) {
 			my @f = split /\s*:\s+/;
 			$f[0] =~ s/^# //; # remove leading '#' from field name
-			$d->{$id}->{$f[0]} = $f[1];
+			$d->{$acc}->{$f[0]} = $f[1];
 		}
 	}
-	else { # assembly statistics; these have five columns
+	else { # assembly statistics; these have six columns and we want the last two
 		my @f = split;
 		if ($f[0] eq 'all') { 
-			$d->{$id}->{$f[4]} = $f[5];
+			$d->{$acc}->{$f[4]} = $f[5];
 		}
 	}
 }
 
-# these are the interesting fields
+# these are the interesting fields, in order
 my @fields = (
 	'Organism name',
 	'Shorthand',
@@ -78,29 +78,29 @@ my $rowfmt = "%s\t" x scalar @fields;
 # add URL column and print table header
 printf $rowfmt . "%s\n", @fields, 'URL';
 
-while (my ($id, $props) = each %$d) {
-	# construct the taxon shorthand
+while (my ($acc, $props) = each %$d) {
+	# construct a taxon shorthand
 	my ($gen, $spec) = split ' ', $props->{'Organism name'}, 2;
 	$props->{'Shorthand'} = lc(substr($gen, 0, 1) . substr($spec, 0, 4));
 
 	# print all fields in tab-separated format, empty string if undefined
-	printf $rowfmt, map { $props->{$_} || '' } @fields;
+	printf $rowfmt, map { $props->{$_} // '' } @fields;
 
 	# also construct and print URL from assembly accession
-	my $url_dir1 = substr($id, 0, 3);
-	my $url_dir2 = substr($id, 4, 3); # skip the underscore
-	my $url_dir3 = substr($id, 7, 3);
-	my $url_dir4 = substr($id, 10, 3);
-	#  example:   ftp://ftp.ncbi.nlm.nih.gov/genomes/all/GCA/000/516/895/GCA_000516895.1_LocustGenomeV1/GCA_000516895.1_LocustGenomeV1_genomic.fna.gz
+	# example:   ftp://ftp.ncbi.nlm.nih.gov/genomes/all/GCA/000/516/895/GCA_000516895.1_LocustGenomeV1/GCA_000516895.1_LocustGenomeV1_genomic.fna.gz
 	my $urlfmt = "ftp://ftp.ncbi.nlm.nih.gov/genomes/all/%s/%03d/%03d/%03d/%s_%s/%s_%s_genomic.fna.gz";
+	my $url_dir1 = substr($acc, 0, 3);
+	my $url_dir2 = substr($acc, 4, 3); # skip the underscore
+	my $url_dir3 = substr($acc, 7, 3);
+	my $url_dir4 = substr($acc, 10, 3);
 	printf $urlfmt,
 		$url_dir1,
 		$url_dir2,
 		$url_dir3,
 		$url_dir4,
-		$id,
+		$acc,
 		$props->{'Assembly name'},
-		$id,
+		$acc,
 		$props->{'Assembly name'},
 	;
 
