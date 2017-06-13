@@ -4,21 +4,28 @@ use warnings;
 use autodie;
 use File::Basename;
 
+# Parse NCBI assembly statistics files and produce a tab-separated table
+# Input: text files from NCBI
+# Output: tab-separated table (on stdout)
+
+
+# the data structure will be a hash of hashes, with the primary key being the
+# assembly accession; secondary keys will be assembly metadata and properties
 my $d = { };
 
 # parse files and make data structure
 while (<>) {
-	s/\s*$//;
-	my $id = basename $ARGV;
-	$id =~ s/_assembly_stats\.txt$//;
-	if (/^#/) {
+	s/\s*$//; # remove trailing whitespace
+	my $id = basename $ARGV; # construct ID from file name
+	$id =~ s/_assembly_stats\.txt$//; # remove file name suffix from ID
+	if (/^#/) { # assembly metadata: IDs, name, submitter, method, etc.
 		if (/: /) {
-			my @f = split /\s*:\s+/, $_;
-			$f[0] =~ s/^# //;
+			my @f = split /\s*:\s+/;
+			$f[0] =~ s/^# //; # remove leading '#' from field name
 			$d->{$id}->{$f[0]} = $f[1];
 		}
 	}
-	else {
+	else { # assembly statistics; these have five columns
 		my @f = split;
 		if ($f[0] eq 'all') { 
 			$d->{$id}->{$f[4]} = $f[5];
@@ -26,22 +33,25 @@ while (<>) {
 	}
 }
 
+# these are the interesting fields
 my @fields = (
 	'Organism name',
 	'Shorthand',
-	'GenBank Assembly ID',
-	'RefSeq Assembly ID',
-	'GenBank Assembly Accession',
+	'RefSeq assembly accession',
+	'GenBank assembly accession',
+	'RefSeq assembly and GenBank assemblies identical',
+	'WGS project',
+	'BioProject',
 	'BioSample',
 	'Taxid',
 	'Date',
 	'Submitter',
 	'Release type',
 	'Assembly name',
+	'Synonyms',
 	'Assembly type',
 	'Assembly level',
 	'Genome representation',
-	'WGS project',
 	'Assembly method',
 	'Genome coverage',
 	'Sequencing technology',
@@ -62,26 +72,21 @@ my @fields = (
 	'region-count',
 );
 
-# formats
+# tab-separated table format according to number of fields
 my $rowfmt = "%s\t" x scalar @fields;
 
-
-# table header
+# add URL column and print table header
 printf $rowfmt . "%s\n", @fields, 'URL';
 
 while (my ($id, $props) = each %$d) {
-	# remove whitespace from IDs and construct the taxon shorthand
-	$props->{'GenBank Assembly ID'} =~ s/ .+$// if defined $props->{'GenBank Assembly ID'};
-	$props->{'RefSeq Assembly ID'} =~ s/ .+$// if defined $props->{'RefSeq Assembly ID'};
-	$props->{'GenBank Assembly Accession'} =~ s/ .+$// if defined $props->{'GenBank Assembly Accession'};
-	$props->{'Assembly Name'} =~ s/\s+/_/g if defined $props->{'Assembly Name'};
+	# construct the taxon shorthand
 	my ($gen, $spec) = split ' ', $props->{'Organism name'}, 2;
 	$props->{'Shorthand'} = lc(substr($gen, 0, 1) . substr($spec, 0, 4));
 
-	# tabular output
+	# print all fields in tab-separated format, empty string if undefined
 	printf $rowfmt, map { $props->{$_} || '' } @fields;
 
-	# also construct and print URL
+	# also construct and print URL from assembly accession
 	my $url_dir1 = substr($id, 0, 3);
 	my $url_dir2 = substr($id, 4, 3); # skip the underscore
 	my $url_dir3 = substr($id, 7, 3);
@@ -94,9 +99,9 @@ while (my ($id, $props) = each %$d) {
 		$url_dir3,
 		$url_dir4,
 		$id,
-		$props->{'Assembly Name'},
+		$props->{'Assembly name'},
 		$id,
-		$props->{'Assembly Name'},
+		$props->{'Assembly name'},
 	;
 
 	# end of line
