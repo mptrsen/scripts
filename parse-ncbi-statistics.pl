@@ -88,7 +88,7 @@ while (my ($acc, $props) = each %$d) {
 
 	# also construct and print URL from assembly accession
 	# example:   ftp://ftp.ncbi.nlm.nih.gov/genomes/all/GCA/000/516/895/GCA_000516895.1_LocustGenomeV1/GCA_000516895.1_LocustGenomeV1_genomic.fna.gz
-	my $urlfmt = "ftp://ftp.ncbi.nlm.nih.gov/genomes/all/%s/%03d/%03d/%03d/%s_%s/%s_%s_genomic.fna.gz";
+	my $urlfmt = "ftp://ftp.ncbi.nlm.nih.gov/genomes/all/%s/%03d/%03d/%03d/%s/%s_genomic.fna.gz";
 	my $url_dir1 = substr($acc, 0, 3);
 	my $url_dir2 = substr($acc, 4, 3); # skip the underscore
 	my $url_dir3 = substr($acc, 7, 3);
@@ -99,9 +99,7 @@ while (my ($acc, $props) = each %$d) {
 		$url_dir3,
 		$url_dir4,
 		$acc,
-		$props->{'Assembly name'},
 		$acc,
-		$props->{'Assembly name'},
 	;
 
 	# end of line
