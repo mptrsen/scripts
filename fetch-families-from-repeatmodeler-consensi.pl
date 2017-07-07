@@ -52,8 +52,8 @@ use Carp;
 
 sub new {
 	my $class = shift;
-	my $rmdir = shift || croak;
-	my $hdr = shift || croak;
+	my $rmdir = shift || confess;
+	my $hdr = shift || confess;
 	my $self = parse_header($hdr);
 	bless $self, $class;
 	$self->file( File::Spec->catfile($rmdir, 'round-' . $self->round(), 'family-' . $self->family() . '.fa') );
@@ -85,7 +85,7 @@ sub output_directory {
 sub file {
 	my $self = shift;
 	return $self->{'file'} if defined $self->{'file'};
-	$self->{'file'} = shift || croak;
+	$self->{'file'} = shift || confess;
 }
 
 sub name {
@@ -126,8 +126,8 @@ sub hmmfile {
 
 sub make_alignment {
 	my $self = shift;
-	my $outdir = shift || croak;
-	my $ncpu = shift || croak;
+	my $outdir = shift || confess;
+	my $ncpu = shift || confess;
 	my $inf = $self->file();
 	my $outf = catfile($outdir, basename($inf, '.fa') . '.afa');
 	system("linsi --thread $ncpu '$inf' > '$outf' 2> /dev/null") and die;
@@ -137,8 +137,8 @@ sub make_alignment {
 
 sub make_hmm {
 	my $self = shift @_;
-	my $outdir = shift || croak;
-	my $ncpu = shift || croak;
+	my $outdir = shift || confess;
+	my $ncpu = shift || confess;
 	my $inf = $self->msafile();
 	my $name = $self->header();
 	my $outf = catfile($outdir, basename($inf) . '.hmm');
@@ -179,7 +179,7 @@ sub next_seq {
 	return unless defined(my $item = readline($fh));  # read the line(s)
 	chomp $item;
 	if ($. == 1 and $item !~ /^>/) {  # first line is not a header
-		croak "Fatal: " . $self->{'filename'} . " is not a FASTA file: Missing descriptor line\n";
+		confess "Fatal: " . $self->{'filename'} . " is not a FASTA file: Missing descriptor line\n";
 	}
 	# remove the '>'
 	$item =~ s/^>//;
