@@ -16,27 +16,43 @@ use Getopt::Long;
 
 my $usage = "Usage: $0 [--ncpu N] [--outdir Output_dir] RModeler_dir\n";
 
-my $outdir;
-my $ncpu;
-my $rmdir;
-my $opts = GetOptions( "outdir=s" => \$outdir, 'ncpu=i' => \$ncpu, 'rmdir=s' => \$rmdir ) or die "Error in command line arguments\n";
-$outdir //= '.';
-$ncpu   //= 1;
+my $outdir   = '.';
+my $ncpu     = 1;
+my $rmdir    = '';
+my $linsi    = 'linsi';
+my $hmmbuild = 'hmmbuild';
+GetOptions(
+	'outdir=s'           => \$outdir,
+	'ncpu=i'             => \$ncpu,
+	'rmdir=s'            => \$rmdir,
+	'path-to-linsi=s'    => \$linsi,
+	'path-to-hmmbuild=s' => \$hmmbuild,
+) or die "Error in command line arguments\n";
 $rmdir  //= shift @ARGV or die $usage;
+
+# make sure paths exist where specified
+-d $outdir or die "Output directory '$outdir' not found\n";
+-d $rmdir or die "RModeler directory '$rmdir' not found\n";
+system( "$linsi --help > /dev/null 2>&1" ) or die "linsi not found or not executable at '$linsi'\n";
+system( "$hmmbuild --help > /dev/null 2>&1" ) or die "hmmbuild not found or not executable at '$hmmbuild'\n";
 
 # find and load consensus sequences into memory
 # (even though we only need the headers)
 my $consensi_file = File::Spec->catfile($rmdir, 'consensi.fa.classified');
 my $consensus_sequences = Seqload::Fasta::slurp_fasta($consensi_file);
 
+
 # go through keys, parse round and family information, assign file paths to them
+my $i = 0;
+my $n = scalar keys %$consensus_sequences;
 foreach my $header (sort { $a cmp $b } keys %$consensus_sequences) {
+	$i++;
 	my $family = Family->new($rmdir, $header);
-	printf "Making MSA for round %d, family %d (%s) from file %s\n", $family->round(), $family->family(), $family->name(), $family->file();
-	$family->make_alignment( $outdir, $ncpu );
+	printf "Making MSA for round %d, family %d (%s) from file %s (%d of %d)\n", $family->round(), $family->family(), $family->name(), $family->file(), $i, $n;
+	$family->make_alignment( $outdir, $linsi, $ncpu );
 	printf "MSA file: %s\n", $family->msafile();
 	print "Making HMM\n";
-	$family->make_hmm( $outdir, $ncpu );
+	$family->make_hmm( $outdir, $hmmbuild, $ncpu );
 	printf "HMM file: %s\n", $family->hmmfile();
 	print "-------------------\n";
 }
@@ -79,7 +95,7 @@ sub parse_header {
 sub output_directory {
 	my $self = shift;
 	return $self->{'output_directory'} if defined $self->{'output_directory'};
-	$self->{'output_directory'} = shift;
+	$self->{'output_directory'} = shift || confess;
 }
 
 sub file {
@@ -91,46 +107,47 @@ sub file {
 sub name {
 	my $self = shift;
 	return $self->{'name'} if defined $self->{'name'};
-	$self->{'name'} = shift || carp;
+	$self->{'name'} = shift || confess;
 }
 
 sub round {
 	my $self = shift;
 	return $self->{'round'} if defined $self->{'round'};
-	$self->{'round'} = shift || carp;
+	$self->{'round'} = shift || confess;
 }
 
 sub family {
 	my $self = shift;
 	return $self->{'family'} if defined $self->{'family'};
-	$self->{'family'} = shift || carp;
+	$self->{'family'} = shift || confess;
 }
 
 sub header {
 	my $self = shift;
 	return $self->{'header'} if defined $self->{'header'};
-	$self->{'header'} = shift || carp;
+	$self->{'header'} = shift || confess;
 }
 
 sub msafile {
 	my $self = shift;
 	return $self->{'msafile'} if defined $self->{'msafile'};
-	$self->{'msafile'} = shift || carp;
+	$self->{'msafile'} = shift || confess;
 }
 
 sub hmmfile {
 	my $self = shift;
 	return $self->{'hmmfile'} if defined $self->{'hmmfile'};
-	$self->{'hmmfile'} = shift || carp;
+	$self->{'hmmfile'} = shift || confess;
 }
 
 sub make_alignment {
 	my $self = shift;
 	my $outdir = shift || confess;
+	my $linsi = shift || confess;
 	my $ncpu = shift || confess;
 	my $inf = $self->file();
 	my $outf = catfile($outdir, basename($inf, '.fa') . '.afa');
-	system("linsi --thread $ncpu '$inf' > '$outf' 2> /dev/null") and die;
+	system("$linsi --thread $ncpu '$inf' > '$outf' 2> /dev/null") and confess "Fatal: mafft failed: $!";
 	$self->msafile($outf);
 	return $self->msafile();
 }
@@ -138,11 +155,12 @@ sub make_alignment {
 sub make_hmm {
 	my $self = shift @_;
 	my $outdir = shift || confess;
+	my $hmmbuild = shift || confess;
 	my $ncpu = shift || confess;
 	my $inf = $self->msafile();
 	my $name = $self->header();
 	my $outf = catfile($outdir, basename($inf) . '.hmm');
-	system("hmmbuild --cpu $ncpu -n '$name' --informat afa '$outf' '$inf' 2> /dev/null") and die;
+	system("$hmmbuild --cpu $ncpu -n '$name' --informat afa '$outf' '$inf' 2> /dev/null") and confess "Fatal: hmmbuild failed: $!";
 	$self->hmmfile($outf);
 	return $self->hmmfile();
 }
