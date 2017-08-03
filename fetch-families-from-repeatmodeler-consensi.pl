@@ -7,28 +7,94 @@ use File::Basename;
 use Data::Dumper;
 use Getopt::Long;
 
-# Reads a consensi.fa.classified file from RepeatModeler,
-# fetches the sequences from the RM output directory,
-# makes a multiple sequence alignment for each family,
-# constructs a HMM for each family for future searching.
-#
-# Parameters: path to RModeler output directory
+=head1 NAME
 
-my $usage = "Usage: $0 [--ncpu N] [--outdir Output_dir] RModeler_dir\n";
+fetch-families-from-repeatmodeler-consensi.pl -- Build profile HMMs from RepeatModeler families
 
-my $outdir   = '.';
-my $ncpu     = 1;
-my $rmdir    = '';
-my $linsi    = 'linsi';
-my $hmmbuild = 'hmmbuild';
+=head1 SYNOPSIS
+
+B<fetch-families-from-repeatmodeler-consensi.pl> [OPTIONS] [--outdir Output_dir] --rmdir RModeler_dir
+
+=head1 DESCRIPTION
+
+Reads a consensi.fa.classified file from RepeatModeler, fetches the sequences
+from the corresponding RM output directory, makes a multiple sequence alignment
+for each family, and constructs a HMM for each family for future searching.
+
+Mandatory parameter: Path to RModeler output directory
+
+=head1 OPTIONS
+
+=over
+
+=item B<--species> Species_name
+
+Specify species name. Genus and species can be separated by underscore or space
+(in that case, you need quotes around it). Used to construct accession.
+Mandatory.
+
+=item B<--rmdir> [pathspec]
+
+Specify path to RepeatModeler output directory (usually ends in something like
+"RM_26226.TueDec230307382014"). Mandatory.
+
+=item B<--ncpu> [N]
+
+Use N CPU threads. Default: 1 thread.
+
+=item B<--outdir> [pathspec]
+
+Specify output directory. Default: current directory.
+
+=item B<--path-to-linsi> [pathspec]
+
+Specify path to B<linsi>, if not present in PATH. Default: "mafft".
+
+=item B<--path-to-hmmbuild> [pathspec]
+
+Specify path to B<hmmbuild>, if not present in PATH. Default: "hmmbuild".
+
+=item B<--accession-prefix> [prefix]
+
+Specify prefix to be used in HMM accession strings. Default: unset (no prefix, just 'rNfY')
+
+=back
+
+=head1 AUTHOR
+
+Malte Petersen L<<mptrsen@uni-bonn.de>>
+
+=head1 LICENSE
+
+Copyright (c) 2017 Malte Petersen. Licensed under the GNU General Public
+License (GPL) version 3. This is free software: you are free to change and
+redistribute it. There is NO WARRANTY, to the extent permitted by law.
+
+
+=cut
+
+my $usage = "Usage: $0 [--ncpu N] [--outdir Output_dir] [options] --species Species_name --rmdir RModeler_dir\n";
+
+my $outdir           = '.';
+my $ncpu             = 1;
+my $rmdir            = '';
+my $linsi            = 'linsi';
+my $hmmbuild         = 'hmmbuild';
+my $species          = '';
+my $accession_prefix = undef;
 GetOptions(
 	'outdir=s'           => \$outdir,
 	'ncpu=i'             => \$ncpu,
 	'rmdir=s'            => \$rmdir,
 	'path-to-linsi=s'    => \$linsi,
 	'path-to-hmmbuild=s' => \$hmmbuild,
+	'species=s'          => \$species,
+	'accession-prefix=s' => \$accession_prefix,
 ) or die "Error in command line arguments\n";
-$rmdir  //= shift @ARGV or die $usage;
+$rmdir   //= shift @ARGV or die $usage;
+$species //= shift @ARGV or die $usage;
+
+$species = Species->new($species);
 
 # make sure paths exist where specified
 -d $outdir or die "Output directory '$outdir' not found\n";
@@ -48,16 +114,42 @@ my $n = scalar keys %$consensus_sequences;
 foreach my $header (sort { $a cmp $b } keys %$consensus_sequences) {
 	$i++;
 	my $family = Family->new($rmdir, $header);
-	printf "Making MSA for round %d, family %d (%s) from file %s (%d of %d)\n", $family->round(), $family->family(), $family->name(), $family->file(), $i, $n;
+	$family->accession( { prefix => $accession_prefix } );
+	printf "Making MSA for round %d, family %d (%s) from file %s (%d of %d)\n",
+		$family->round(),
+		$family->family(),
+		$family->name(),
+		$family->file(),
+		$i,
+		$n,
+	;
 	$family->make_alignment( $outdir, $linsi, $ncpu );
 	printf "MSA file: %s\n", $family->msafile();
 	print "Making HMM\n";
 	$family->make_hmm( $outdir, $hmmbuild, $ncpu );
 	printf "HMM file: %s\n", $family->hmmfile();
+	$family->add_accession_to_hmm();
+	print "Added accession ", $family->accession(), "\n";
 	print "-------------------\n";
 }
 
 package Family;
+
+=head1 NAME
+
+Family
+
+=head1 DESCRIPTION
+
+Handles repeat family identification from RepeatModeler consensi.fa.classified
+files. Can find the corresponding files from a repeatmodeler output directory
+by parsing the headers.
+
+Constructs MSA and HMM files from the sequences using mafft and hmmbuild,
+respectively. Can additionally add an accession number to the resulting HMM
+files.
+
+=cut
 
 use strict;
 use warnings;
@@ -65,6 +157,7 @@ use autodie;
 use File::Basename;
 use File::Spec::Functions;
 use Carp;
+use Tie::File;
 
 sub new {
 	my $class = shift;
@@ -140,18 +233,26 @@ sub hmmfile {
 	$self->{'hmmfile'} = shift || confess;
 }
 
+# returns a string based on round and family information
+sub file_basename {
+	my $self = shift;
+	return catfile('round-' . $self->round() . '_family-' . $self->family());
+}
+
+# infers a multiple sequence alignment (MSA) using MAFFT L-INS-i and returns the path to the MSA file
 sub make_alignment {
 	my $self = shift;
 	my $outdir = shift || confess;
 	my $linsi = shift || confess;
 	my $ncpu = shift || confess;
 	my $inf = $self->file();
-	my $outf = catfile($outdir, basename($inf, '.fa') . '.afa');
+	my $outf = catfile($outdir, $self->file_basename() . '.afa');
 	system("$linsi --thread $ncpu '$inf' > '$outf' 2> /dev/null") and confess "Fatal: mafft failed: $!";
 	$self->msafile($outf);
 	return $self->msafile();
 }
 
+# generates a HMM profile and returns the path to it
 sub make_hmm {
 	my $self = shift @_;
 	my $outdir = shift || confess;
@@ -159,12 +260,97 @@ sub make_hmm {
 	my $ncpu = shift || confess;
 	my $inf = $self->msafile();
 	my $name = $self->header();
-	my $outf = catfile($outdir, basename($inf) . '.hmm');
+	my $outf = catfile($outdir, $self->file_basename() . '.hmm');
 	system("$hmmbuild --cpu $ncpu -n '$name' --informat afa '$outf' '$inf' 2> /dev/null") and confess "Fatal: hmmbuild failed: $!";
 	$self->hmmfile($outf);
 	return $self->hmmfile();
 }
 
+# constructs accession using species shorthand, round and family information
+sub accession {
+	my $self = shift;
+	my $opts = shift;
+	return $self->{'accession'} if defined $self->{'accession'};
+	my $prefix = $opts->{'prefix'};
+	if (defined $prefix) {
+		$self->{'accession'} = $prefix . '_r' . $self->round() . 'f' . $self->family();
+	}
+	else {
+		$self->{'accession'} = 'r' . $self->round() . 'f' . $self->family();
+	}
+}
+
+# adds accession to the HMM file
+sub add_accession_to_hmm {
+	my $self = shift;
+	tie my @model_file, 'Tie::File', $self->hmmfile();
+	return if grep { /^ACC/ } @model_file; # in case this has been modified before
+	splice @model_file, 2, 0, 'ACC   ' . $self->accession();
+	untie @model_file;
+}
+
+package Species;
+
+=head1 NAME
+
+Species
+
+=head1 SYNOPSIS
+
+    my $species = Species->new("Homo sapiens");
+		print $species->genus, "\n";
+		print $species->species, "\n";
+		print $species->shorthand, "\n"; # 1:4 lowercase abbreviation
+
+=head1 DESCRIPTION
+
+Handles species name formatting etc.
+
+=cut
+
+use strict;
+use warnings;
+use Carp;
+
+sub new {
+	my $class = shift;
+	my $species_string = shift;
+	my ($genus, $species) = split / |_/, $species_string;
+	my $self = {
+		'species' => $species,
+		'genus'   => $genus,
+	};
+	return bless $self, $class;
+}
+
+sub genus {
+	my $self = shift;
+	return $self->{'genus'} if defined $self->{'genus'};
+	$self->{'genus'} = shift || confess;
+}
+
+sub species {
+	my $self = shift;
+	return $self->{'species'} if defined $self->{'species'};
+	$self->{'species'} = shift || confess;
+}
+
+sub full_name {
+	my $self = shift;
+	return $self->genus() . '_' . $self->species();
+}
+
+sub shorthand {
+	my $self = shift;
+	return $self->{'shorthand'} if defined $self->{'shorthand'};
+	if ($self->species()) {
+		$self->{'shorthand'} = lc substr($self->genus(), 0, 1) . lc substr($self->species(), 0, 4);
+	}
+	else { # if there was no genus/species separator, we only have genus
+		$self->{'shorthand'} = $self->genus();
+	}
+	return $self->{'shorthand'};
+}
 
 package Seqload::Fasta;
 use strict;

@@ -11,6 +11,9 @@ while (<>) {
 	if (/^\s+data\.addColumn/) {
 		push @interestinglines, $_;
 	}
+	elsif (/^\s+var pieData/) {
+		last;
+	}
 	elsif (/^\s+\[/) {
 		push @interestinglines, $_;
 	}
