@@ -18,6 +18,20 @@
 echo "######## Music file tagger ########"
 echo
 
+append=0
+
+# options:
+# -a : append (preserve existing tags)
+while getopts "a" option; do
+	case "$option" in
+		a)
+			append=1
+			;;
+	esac
+	# remove option from parameter list
+	shift $((OPTIND-1))
+done
+
 function die {
 	echo "$@"
 	exit 1
@@ -51,7 +65,7 @@ for file in "$@"; do
 	read -p "Title:  "         TIT
 	read -p "Track:  "         TRK
 	# use different programs depending on file type
-	if   [[ "$file" =~ mp3$ ]]; then # is an mp3 file
+	if   [[ "$file" =~ mp3$ || "$file" =~ MP3$ ]]; then # is an mp3 file
 		id3v2 \
 			--artist "$ART" \
 			--album  "$ALB" \
@@ -59,8 +73,22 @@ for file in "$@"; do
 			--track  "$TRK/$NUM" \
 			--song   "$TIT" \
 			"$file" || die
-	elif [[ "$file" =~ ogg$ ]]; then # is an ogg vorbis file
-		vorbiscomment --write \
+	elif [[ "$file" =~ ogg$ || "$file" =~ OGG$ ]]; then # is an ogg vorbis file
+		if [[ $append -eq 0 ]]; then
+			# delete all tags
+			vorbiscomment --write --commentfile /dev/null "$file"
+		#--------------------------------------------------
+		# else 
+		# 	# save existing tags to a file
+		# 	vorbiscomment -l "$file" > .tags.tmp
+		# 	# write existing tags
+		# 	vorbiscomment --write --commentfile '.tags.tmp' "$file"
+		# 	# delete comment file
+		# 	rm .tags.tmp
+		#-------------------------------------------------- 
+		fi
+		# write new tags
+		vorbiscomment --write --append\
 			--tag "ARTIST=$ART" \
 			--tag "ALBUM=$ALB" \
 			--tag "DATE=$YER" \
