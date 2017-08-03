@@ -39,8 +39,10 @@ function die {
 
 # make file list first
 echo "# Files #"
+declare -i n=0 # counter
 for file in "$@"; do
-	printf "%s\n" "$file"
+	let n++
+	printf "%02d: %s\n" $n "$file"
 done
 
 # spacer
@@ -56,7 +58,7 @@ read -p "Tracks: " NUM
 # spacer
 echo
 
-declare -i n=0
+let n=0 # counter
 for file in "$@"; do
 	printf "# Tagging %s #\n" "$file"
 	printf "Artist: %s\n"     "$ART"
@@ -100,4 +102,4 @@ for file in "$@"; do
 	echo
 done
 
-printf "# Done: Tagged %d files\n" $n
+printf "# Done: Tagged %d files. Bye.\n" $n
