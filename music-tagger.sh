@@ -19,12 +19,12 @@
 ###            Functions           ###
 ######################################
 
-# function: striptags
+# deletes all tags from a file
 function striptags {
 	shopt -s nocasematch
 	if   [[ "$1" =~ mp3$ ]]; then
 		# delete id3v2 tags
-		id3v2 --delete "$1" || exit 1
+		id3v2 --delete-all "$1" || exit 1
 	elif [[ "$1" =~ ogg$ ]]; then
 		# delete vorbis comments
 		vorbiscomment --write --commentfile /dev/null "$1" || exit 1
@@ -32,7 +32,7 @@ function striptags {
 	shopt -u nocasematch
 }
 
-# function: listtags
+# lists all tags in a file
 function listtags {
 	shopt -s nocasematch
 	if   [[ "$1" =~ mp3$ ]]; then
@@ -92,6 +92,7 @@ read -p "Tracks: " NUM
 # spacer
 echo
 
+shopt -s nocasematch # case-insensitive pattern matching
 let n=0 # counter
 for file in "$@"; do
 	printf "# Tagging %s #\n" "$file"
@@ -100,18 +101,19 @@ for file in "$@"; do
 		echo "## Existing tags:"
 		listtags "$file"
 	fi
-	# get file-specific infos, allow editing of globals
-	read -e -p "Artist: " -i "$ART"
-	read -e -p "Album:  " -i "$ALB"
-	read -e -p "Year:   " -i "$YER"
-	read -e -p "Title:  "      TIT
-	read -e -p "Track:  "      TRK
 	# remove existing tags
 	if [[ $append -eq 0 ]]; then
 		striptags "$file"
 	fi
+	# get file-specific infos, allow editing of globals
+	unset TIT TRK # need no defaults
+	read -e -p "Artist: " -i "$ART" ART
+	read -e -p "Album:  " -i "$ALB" ALB
+	read -e -p "Year:   " -i "$YER" YER
+	read -e -p "Title:  "           TIT
+	read -e -p "Track:  "           TRK
 	# use different programs depending on file type
-	if   [[ "${file^^}" =~ mp3$ ]]; then # is an mp3 file
+	if   [[ "$file" =~ mp3$ ]]; then # is an mp3 file
 		id3v2 \
 			--artist "$ART" \
 			--album  "$ALB" \
@@ -119,7 +121,7 @@ for file in "$@"; do
 			--track  "$TRK/$NUM" \
 			--song   "$TIT" \
 			"$file" || exit 1
-	elif [[ "${file^^}" =~ ogg$ || "$file" =~ OGG$ ]]; then # is an ogg vorbis file
+	elif [[ "$file" =~ ogg$ ]]; then # is an ogg vorbis file
 		# write new tags
 		vorbiscomment --write --append\
 			--tag "ARTIST=$ART" \
