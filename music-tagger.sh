@@ -15,14 +15,49 @@
 #    You should have received a copy of the GNU General Public License
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+######################################
+###            Functions           ###
+######################################
+
+# function: striptags
+function striptags {
+	shopt -s nocasematch
+	if   [[ "$1" =~ mp3$ ]]; then
+		# delete id3v2 tags
+		id3v2 --delete "$1" || exit 1
+	elif [[ "$1" =~ ogg$ ]]; then
+		# delete vorbis comments
+		vorbiscomment --write --commentfile /dev/null "$1" || exit 1
+	fi
+	shopt -u nocasematch
+}
+
+# function: listtags
+function listtags {
+	shopt -s nocasematch
+	if   [[ "$1" =~ mp3$ ]]; then
+		# delete id3v2 tags
+		id3v2 --list-rfc822 "$1" || exit 1
+	elif [[ "$1" =~ ogg$ ]]; then
+		# delete vorbis comments
+		vorbiscomment --list "$1" || exit 1
+	fi
+	shopt -u nocasematch
+}
+
+######################################
+###        Begin main block        ###
+######################################
+
 echo "######## Music file tagger ########"
 echo
 
 append=0
 verbose=0
 
-# options:
+# get options:
 # -a : append (preserve existing tags)
+# -v : verbose (list existing tags before editing)
 while getopts "av" option; do
 	case "$option" in
 		a)
@@ -36,7 +71,7 @@ while getopts "av" option; do
 	shift $((OPTIND-1))
 done
 
-# make file list first
+# print file list first
 echo "# Files #"
 declare -i n=0 # counter
 for file in "$@"; do
@@ -57,20 +92,13 @@ read -p "Tracks: " NUM
 # spacer
 echo
 
-# function: delete-tags
-# function: add-tags
-
 let n=0 # counter
 for file in "$@"; do
 	printf "# Tagging %s #\n" "$file"
 	# list existing tags if verbose (-v)
 	if [[ $verbose -ne 0 ]]; then
-		printf "## Existing tags:\n"
-		if [[ "${file^^}" =~ mp3$ ]]; then
-			id3v2 --list-rfc822 "$file"
-		elif [[ "${file^^}" =~ ogg$ ]]; then
-			vorbiscomment --list "$file"
-		fi
+		echo "## Existing tags:"
+		listtags "$file"
 	fi
 	# get file-specific infos, allow editing of globals
 	read -e -p "Artist: " -i "$ART"
@@ -78,11 +106,12 @@ for file in "$@"; do
 	read -e -p "Year:   " -i "$YER"
 	read -e -p "Title:  "      TIT
 	read -e -p "Track:  "      TRK
+	# remove existing tags
+	if [[ $append -eq 0 ]]; then
+		striptags "$file"
+	fi
 	# use different programs depending on file type
 	if   [[ "${file^^}" =~ mp3$ ]]; then # is an mp3 file
-		if [[ $append -eq 0 ]]; then
-			id3v2 --delete "$file"
-		fi
 		id3v2 \
 			--artist "$ART" \
 			--album  "$ALB" \
@@ -91,10 +120,6 @@ for file in "$@"; do
 			--song   "$TIT" \
 			"$file" || exit 1
 	elif [[ "${file^^}" =~ ogg$ || "$file" =~ OGG$ ]]; then # is an ogg vorbis file
-		if [[ $append -eq 0 ]]; then
-			# delete all tags
-			vorbiscomment --write --commentfile /dev/null "$file" || exit 1
-		fi
 		# write new tags
 		vorbiscomment --write --append\
 			--tag "ARTIST=$ART" \
