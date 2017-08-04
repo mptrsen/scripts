@@ -52,12 +52,11 @@ function listtags {
 echo "######## Music file tagger ########"
 echo
 
-append=0
-verbose=0
-
-# get options:
+# command line options:
 # -a : append (preserve existing tags)
 # -v : verbose (list existing tags before editing)
+append=0
+verbose=0
 while getopts "av" option; do
 	case "$option" in
 		a)
@@ -95,16 +94,20 @@ echo
 shopt -s nocasematch # case-insensitive pattern matching
 let n=0 # counter
 for file in "$@"; do
+
 	printf "# Tagging %s #\n" "$file"
+
 	# list existing tags if verbose (-v)
 	if [[ $verbose -ne 0 ]]; then
 		echo "## Existing tags:"
 		listtags "$file"
 	fi
+
 	# remove existing tags
 	if [[ $append -eq 0 ]]; then
 		striptags "$file"
 	fi
+
 	# get file-specific infos, allow editing of globals
 	unset TIT TRK # need no defaults
 	read -e -p "Artist: " -i "$ART" ART
@@ -112,7 +115,8 @@ for file in "$@"; do
 	read -e -p "Year:   " -i "$YER" YER
 	read -e -p "Title:  "           TIT
 	read -e -p "Track:  "           TRK
-	# use different programs depending on file type
+
+	# actually write tags: use different programs depending on file type
 	if   [[ "$file" =~ mp3$ ]]; then # is an mp3 file
 		id3v2 \
 			--artist "$ART" \
@@ -131,8 +135,12 @@ for file in "$@"; do
 			--tag "TITLE=$TIT" \
 			"$file" || exit 1
 	fi
+
 	let n++ # counter
+
+	# spacer
 	echo
+
 done
 
 printf "# Done: Tagged %d files. Bye.\n" $n
