@@ -19,23 +19,22 @@ echo "######## Music file tagger ########"
 echo
 
 append=0
+verbose=0
 
 # options:
 # -a : append (preserve existing tags)
-while getopts "a" option; do
+while getopts "av" option; do
 	case "$option" in
 		a)
 			append=1
+			;;
+		v)
+			verbose=1
 			;;
 	esac
 	# remove option from parameter list
 	shift $((OPTIND-1))
 done
-
-function die {
-	echo "$@"
-	exit 1
-}
 
 # make file list first
 echo "# Files #"
@@ -58,36 +57,43 @@ read -p "Tracks: " NUM
 # spacer
 echo
 
+# function: delete-tags
+# function: add-tags
+
 let n=0 # counter
 for file in "$@"; do
 	printf "# Tagging %s #\n" "$file"
-	printf "Artist: %s\n"     "$ART"
-	printf "Album:  %s\n"     "$ALB"
-	printf "Year:   %s\n"     "$YER"
-	read -p "Title:  "         TIT
-	read -p "Track:  "         TRK
+	# list existing tags if verbose (-v)
+	if [[ $verbose -ne 0 ]]; then
+		printf "## Existing tags:\n"
+		if [[ "${file^^}" =~ mp3$ ]]; then
+			id3v2 --list-rfc822 "$file"
+		elif [[ "${file^^}" =~ ogg$ ]]; then
+			vorbiscomment --list "$file"
+		fi
+	fi
+	# get file-specific infos, allow editing of globals
+	read -e -p "Artist: " -i "$ART"
+	read -e -p "Album:  " -i "$ALB"
+	read -e -p "Year:   " -i "$YER"
+	read -e -p "Title:  "      TIT
+	read -e -p "Track:  "      TRK
 	# use different programs depending on file type
-	if   [[ "$file" =~ mp3$ || "$file" =~ MP3$ ]]; then # is an mp3 file
+	if   [[ "${file^^}" =~ mp3$ ]]; then # is an mp3 file
+		if [[ $append -eq 0 ]]; then
+			id3v2 --delete "$file"
+		fi
 		id3v2 \
 			--artist "$ART" \
 			--album  "$ALB" \
 			--year   "$YER" \
 			--track  "$TRK/$NUM" \
 			--song   "$TIT" \
-			"$file" || die
-	elif [[ "$file" =~ ogg$ || "$file" =~ OGG$ ]]; then # is an ogg vorbis file
+			"$file" || exit 1
+	elif [[ "${file^^}" =~ ogg$ || "$file" =~ OGG$ ]]; then # is an ogg vorbis file
 		if [[ $append -eq 0 ]]; then
 			# delete all tags
-			vorbiscomment --write --commentfile /dev/null "$file"
-		#--------------------------------------------------
-		# else 
-		# 	# save existing tags to a file
-		# 	vorbiscomment -l "$file" > .tags.tmp
-		# 	# write existing tags
-		# 	vorbiscomment --write --commentfile '.tags.tmp' "$file"
-		# 	# delete comment file
-		# 	rm .tags.tmp
-		#-------------------------------------------------- 
+			vorbiscomment --write --commentfile /dev/null "$file" || exit 1
 		fi
 		# write new tags
 		vorbiscomment --write --append\
@@ -96,7 +102,7 @@ for file in "$@"; do
 			--tag "DATE=$YER" \
 			--tag "TRACKNUMBER=$TRK" \
 			--tag "TITLE=$TIT" \
-			"$file" || die
+			"$file" || exit 1
 	fi
 	let n++ # counter
 	echo
