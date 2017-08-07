@@ -70,6 +70,12 @@ while getopts "av" option; do
 	shift $((OPTIND-1))
 done
 
+# no files provided
+if [[ $# -lt 1 ]]; then
+	echo "Error: No files"
+	exit 1
+fi
+
 # print file list first
 echo "# Files #"
 declare -i n=0 # counter

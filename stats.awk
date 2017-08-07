@@ -12,11 +12,11 @@
 END {
 	
 	# get upper and lower quartiles and median (2nd quartile)
-	Q0 = quantile(c, 0)
-	Q1 = quantile(c, 1)
-	Q2 = quantile(c, 2)
-	Q3 = quantile(c, 3)
-	Q4 = quantile(c, 4)
+	Q0 = quartile(c, 0)
+	Q1 = quartile(c, 1)
+	Q2 = quartile(c, 2)
+	Q3 = quartile(c, 3)
+	Q4 = quartile(c, 4)
 
 	# determine n and calculate mean
 	n = length(c)
@@ -32,8 +32,18 @@ END {
 	N50 = n50(c)
 
 	# output
-	printf("%-12s %-12s %-12s %-12s %-12s %-12s %-12s %-12s %-12s %-12s\n", "n", "sum", "min", "lower", "mean", "median", "upper", "max", "stdev", "N50")
-	printf("%-12d %-12f %-12f %-12f %-12f %-12f %-12f %-12f %-12f %-12f\n", n, sum, Q0, Q1, mean, Q2, Q3, Q4, stdev, N50)
+	printf("%-12s %-14s %-12s %-12s %-12s %-12s %-12s %-12s %-12s %-12s\n", "n", "sum", "min", "lower", "mean", "median", "upper", "max", "stdev", "N50")
+	printf("%-12s %-14s %-12s %-12s %-12s %-12s %-12s %-12s %-12s %-12s\n", r("-", 12), r("-", 14), r("-", 12), r("-", 12), r("-", 12), r("-", 12), r("-", 12), r("-", 12), r("-", 12), r("-", 12))
+	printf("%-12d %-14f %-12f %-12f %-12f %-12f %-12f %-12f %-12f %-12f\n",  n,   sum,   Q0,    Q1,      mean,   Q2,       Q3,      Q4,    stdev,   N50)
+	print "---" * 15
+}
+
+function r(s, n) {
+	res = ""
+	for (i = 0; i < n; i++) {
+		res = res s
+	}
+	return res
 }
 
 function n50(nums) {
@@ -54,7 +64,7 @@ function n50(nums) {
 
 # determine median
 function median(nums) {
-	return quantile(nums, 2)
+	return quartile(nums, 2)
 	n = length(nums)
 	if (n % 2) {
 		# odd number of samples,
@@ -68,8 +78,8 @@ function median(nums) {
 	}
 }
 
-# determine distribution quantiles (0 = min, 4 = max)
-function quantile(nums, p) {
+# determine distribution quartiles (0 = min, 2 = median, 4 = max)
+function quartile(nums, p) {
 	q = p/4
 	l = length(nums)
 	t = (l-1)*q+1 # our array is one-based
