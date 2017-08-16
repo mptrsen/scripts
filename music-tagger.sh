@@ -125,6 +125,7 @@ for file in "$@"; do
 	# actually write tags: use different programs depending on file type
 	if   [[ "$file" =~ mp3$ ]]; then # is an mp3 file
 		id3v2 \
+			--id3v1-only \
 			--artist "$ART" \
 			--album  "$ALB" \
 			--year   "$YER" \
