@@ -80,6 +80,7 @@ my $ncpu             = 1;
 my $rmdir            = '';
 my $linsi            = 'linsi';
 my $hmmbuild         = 'hmmbuild';
+my $no_hmms          = 0;
 my $species          = '';
 my $accession_prefix = undef;
 GetOptions(
@@ -88,6 +89,7 @@ GetOptions(
 	'rmdir=s'            => \$rmdir,
 	'path-to-linsi=s'    => \$linsi,
 	'path-to-hmmbuild=s' => \$hmmbuild,
+	'no-hmms'            => \$no_hmms,
 	'species=s'          => \$species,
 	'accession-prefix=s' => \$accession_prefix,
 ) or die "Error in command line arguments\n";
@@ -125,11 +127,13 @@ foreach my $header (sort { $a cmp $b } keys %$consensus_sequences) {
 	;
 	$family->make_alignment( $outdir, $linsi, $ncpu );
 	printf "MSA file: %s\n", $family->msafile();
-	print "Making HMM\n";
-	$family->make_hmm( $outdir, $hmmbuild, $ncpu );
-	printf "HMM file: %s\n", $family->hmmfile();
-	$family->add_accession_to_hmm();
-	print "Added accession ", $family->accession(), "\n";
+	unless ($no_hmms) {
+		print "Making HMM\n";
+		$family->make_hmm( $outdir, $hmmbuild, $ncpu );
+		printf "HMM file: %s\n", $family->hmmfile();
+		$family->add_accession_to_hmm();
+		print "Added accession ", $family->accession(), "\n";
+	}
 	print "-------------------\n";
 }
 
