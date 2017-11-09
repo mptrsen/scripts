@@ -92,41 +92,41 @@ foreach my $s (@seqs) {
 
 # report
 printf "sequences: %d\n" .
-       "total_length: %d\n" .
-			 "longest: %d\n" .
-			 "shortest: %d\n" .
-			 "n50: %d\n" .
-			 "n90: %d\n" .
-			 "seqs > 1 nt: %d\n" .
-			 "seqs > 500 nt: %d\n" .
-			 "seqs > 1k nt: %d\n" .
-			 "seqs > 10k nt: %d\n" .
-			 "seqs > 100k nt: %d\n" .
-			 "seqs > 1M nt: %d\n" .
-			 "perc A: %.2f\n" .
-			 "perc T: %.2f\n" .
-			 "perc C: %.2f\n" .
-			 "perc G: %.2f\n" .
-			 "perc N: %.2f\n" .
-			 '',
-			 scalar @seqs,
-			 $total_length,
-			 $longest,
-			 $shortest,
-			 $n50,
-			 $n90,
-			 $n_1plus,
-			 $n_500plus,
-			 $n_1k_plus,
-			 $n_10k_plus,
-			 $n_100k_plus,
-			 $n_1m_plus,
-			 $perc_A,
-			 $perc_T,
-			 $perc_C,
-			 $perc_G,
-			 $perc_N,
-			 ;
+	"total_length: %d\n" .
+	"longest: %d\n" .
+	"shortest: %d\n" .
+	"n50: %d\n" .
+	"n90: %d\n" .
+	"seqs > 1 nt: %d\n" .
+	"seqs > 500 nt: %d\n" .
+	"seqs > 1k nt: %d\n" .
+	"seqs > 10k nt: %d\n" .
+	"seqs > 100k nt: %d\n" .
+	"seqs > 1M nt: %d\n" .
+	"perc A: %.2f\n" .
+	"perc T: %.2f\n" .
+	"perc C: %.2f\n" .
+	"perc G: %.2f\n" .
+	"perc N: %.2f\n" .
+	'', # for readability
+	scalar @seqs,
+	$total_length,
+	$longest,
+	$shortest,
+	$n50,
+	$n90,
+	$n_1plus,
+	$n_500plus,
+	$n_1k_plus,
+	$n_10k_plus,
+	$n_100k_plus,
+	$n_1m_plus,
+	$perc_A,
+	$perc_T,
+	$perc_C,
+	$perc_G,
+	$perc_N,
+;
 
 
 package Seqload::Fasta;

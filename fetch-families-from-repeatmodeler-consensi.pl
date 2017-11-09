@@ -42,6 +42,10 @@ Specify path to RepeatModeler output directory (usually ends in something like
 
 Use N CPU threads. Default: 1 thread.
 
+=item B<--no-hmms>
+
+Do not make HMMs, only alignments.
+
 =item B<--outdir> [pathspec]
 
 Specify output directory. Default: current directory.
