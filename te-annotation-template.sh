@@ -17,20 +17,13 @@ set -e
 
 SPECIES='SPECIES_NAME'
 INPUTFILE='GENOMEFILE'
-CLADE="Metazoa" # RepBase will be included using this as taxonomy query
 LIBRARY_FILE="PATH_TO_REPEAT_LIBRARY" # will look for library in RepeatModeler output directory if this does not exist
-PREFIX='/share/pool/malte/analyses/results/te-pipeline' # used to compose output directory by appending SPECIES
-NCPU=${NSLOTS:=1}
+CLADE="Metazoa" # RepBase will be included using this as taxonomy query
+PREFIX='/share/pool/malte/analyses/results/te-annotation' # used to compose output directory by appending SPECIES
 RUN_MODELER=1
 RUN_MASKER=1
 MAKE_LANDSCAPE=1
 DRY_RUN=0
-
-# because of a bug in both RModeler and RMasker, we must halve the number of threads
-let NCPU_RMBLAST=$NCPU/2
-if [[ $NCPU_RMBLAST -lt 1 ]]; then
-	die "Fatal: RMBLAST requires at least 2 cores, but you gave this only $NCPU"
-fi
 
 ####################################
 # Program paths                    #
@@ -39,8 +32,20 @@ fi
 PERL=/opt/perl/bin/perl
 RMASKER_DIR=/share/scientific_bin/RepeatMasker/4.0.7
 RMODELER_DIR=/share/scientific_bin/RepeatModeler/open-1.0.10bugfix
-#FASTASOFTMASK=/share/scientific_bin/exonerate/2.2/bin/fastasoftmask # no longer needed
 LANDSCAPEPARSER=/home/mpetersen/scripts/parse-repeatmasker-landscapes-to-table.pl
+
+####################################
+# Number of threads                #
+####################################
+
+# because of a bug in RModeler that is related to RMBLAST,
+# we must halve the number of threads and still be above 1,
+# so the job must be submitted with at least 4 slots
+NCPU=${NSLOTS:=1} # use number of slots from `-pe orte` submission or default to 1
+let NCPU_RMBLAST=$NCPU/4
+if [[ $NCPU_RMBLAST -lt 1 ]]; then
+	die "Fatal: RMBLAST requires at least 4 cores, but you gave this only $NCPU"
+fi
 
 ####################################
 # General functions                #
@@ -133,7 +138,7 @@ function run-masker {
 	cat $LIB >> $COMBINED_LIB
 
 	echo "## RepeatMasker started on '$GENOME_BASENAME' $(date --rfc-3339=seconds)"
-	run-command $PERL "$RMASKER_DIR/RepeatMasker" -engine ncbi -par $NCPU_RMBLAST -a -xsmall -gff -lib "$COMBINED_LIB" "$GENOME_BASENAME" || return 1
+	run-command $PERL "$RMASKER_DIR/RepeatMasker" -engine ncbi -par $NCPU -a -xsmall -gff -lib "$COMBINED_LIB" "$GENOME_BASENAME" || return 1
 
 	echo "## RepeatMasker done $(date --rfc-3339=seconds)"
 }
@@ -198,7 +203,7 @@ test-if-programs-exist $RMODELER_DIR/BuildDatabase $RMODELER_DIR/RepeatModeler $
 OUTPUT_DIRECTORY="$PREFIX/$SPECIES"
 
 # uncompress input file if gzipped
-if [[ "$INPUTFILE" =~ \.gz$ ]]; then
+if [[ "$INPUTFILE" =~ \.gz$ || -f "$INPUTFILE".gz ]]; then
 	echo "## uncompressing input file"
 	gunzip "$INPUTFILE" || die "Fatal: Could not uncompress gzipped genome file"
 	INPUTFILE=${INPUTFILE%.gz} # remove .gz suffix
@@ -215,7 +220,7 @@ if [[ -f $LIBRARY_FILE || $DRY_RUN -ne 0 ]]; then
 	REPEAT_LIBRARY=$LIBRARY_FILE
 else
 	echo "## Repeat library unspecified or not found, searching in output directory $OUTPUT_DIRECTORY"
-	REPEAT_LIBRARY=$(find "$OUTPUT_DIRECTORY/repeatmodeler" -maxdepth 2 -name "*.classified" -or -name '*-rm-families.fa')
+	REPEAT_LIBRARY=$(find "$OUTPUT_DIRECTORY/repeatmodeler" -maxdepth 2 -name "*.classified" -or -name '*-rm-families.fa' | head  -n 1) # don't care which one, they are identical
 	test -f "$REPEAT_LIBRARY" || die "Fatal: Repeat library not found" # exit if unset
 fi
 echo "## Repeat library: '$REPEAT_LIBRARY'"
@@ -232,6 +237,9 @@ fi
 if [[ "$MAKE_LANDSCAPE" -ne 0 ]]; then
 	post-process "$MASKER_OUTPUT" || die
 fi
+
+# re-gzip the input file to save space
+gzip "$INPUTFILE"
 
 echo "## Summary table: '$MASKER_TABLE'"
 cat "$MASKER_TABLE"
