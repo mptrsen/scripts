@@ -15,6 +15,8 @@
 #    You should have received a copy of the GNU General Public License
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+set -e
+
 # this function fetches data from orthodb and makes sure we don't get html back
 fetch_to_file() {
 	curl -s "$1" > "$2"
@@ -59,7 +61,9 @@ curl -s $URL \
 	> $LISTFILE
 
 # get the table header
-fetch_to_file "${URL/search\?/tab?query=$(head -n 1 $LISTFILE)&}" $TABLEFILE
+TABLE_URL="${URL/search\?/tab?query=$(head -n 1 $LISTFILE)&}" 
+echo "fetching $TABLE_URL"
+fetch_to_file "$TABLE_URL" $TABLEFILE
 TABLE_HEADER=$(head -n 1 "$TABLEFILE")
 
 # fetch all the table lines and fasta files
@@ -70,17 +74,18 @@ cat $LISTFILE | while read OG; do
 	OG_TABLE_FILE=${PREFIX}_$OG.txt
 	TABLE_URL=${URL/search\?/tab?query=$OG&}
 	fetch_to_file "$TABLE_URL" $OG_TABLE_FILE
-	echo "Fetching fasta for $OG ($i of $NUM_OG)"
-	OG_FASTA_FILE=${PREFIX}_$OG.fa
-	FASTA_URL=${URL/search\?/fasta?query=$OG&}
-	fetch_to_file "$FASTA_URL" $OG_FASTA_FILE
+	#echo "Fetching fasta for $OG ($i of $NUM_OG)"
+	#OG_FASTA_FILE=${PREFIX}_$OG.fa
+	#FASTA_URL=${URL/search\?/fasta?query=$OG&}
+	#fetch_to_file "$FASTA_URL" $OG_FASTA_FILE
 done
 
 echo "Combining tables"
 echo "$TABLE_HEADER" > $TABLEFILE
-tail -q -n +2 ${PREFIX}_?OG*.txt >> $TABLEFILE
-echo "Combining fastas"
-cat ${PREFIX}_?OG*.fa > $FASTAFILE
+# because with globbing the argument list might become too long
+find -name "${PREFIX}_?OG*.txt" | sort | xargs tail -q -n +2 >> $TABLEFILE
+#echo "Combining fastas"
+find -name "${PREFIX}_?OG*.fa" | sort | xargs tail -q -n +2 >> $FASTAFILE
 echo "Done."
 echo "Output table: $TABLEFILE"
-echo "Output fasta: $FASTAFILE"
+#echo "Output fasta: $FASTAFILE"
