@@ -6,9 +6,11 @@ use autodie;
 use File::Spec;
 use Getopt::Long;
 
-# Removes sequences that do not match the filter pattern, similar to grep. Filter pattern can be provided as command line argument or as a list of patterns in a file.
+# Removes sequences that do not match the filter pattern, similar to grep.
+# Filter pattern can be provided as command line argument or as a list of
+# patterns in a file. Matching can also be inverted.
 
-my $f = '';    # file with patterns
+my $f = undef; # file with patterns
 my $v = undef; # invert pattern
 my $F = undef; # fixed strings
 my $h = undef; # help
@@ -22,7 +24,15 @@ $help .= "    -f file     read (addional) patterns from file\n";
 $help .= "    -F          interpret patterns as fixed strings instead of regular expressions\n";
 $help .= "    -v          invert match, to select non-matching sequences\n";
 
-GetOptions( 'f=s' => \$f, 'v' => \$v, 'F' => \$F, 'h|help' => \$h ) or die $usage;
+# make sure to heed case for options
+Getopt::Long::Configure( qw(no_ignore_case) );
+
+GetOptions(
+	'f|file=s' => \$f,
+	'v|invert-match' => \$v,
+	'F|fixed-strings' => \$F,
+	'h|help' => \$h,
+) or die $usage;
 
 if ($h) { print $help and exit }
 
@@ -51,13 +61,15 @@ while (my ($h, $s) = $fh->next_seq()) {
 	# normal operation, print only those that match pattern, so start with $print = 0
 	# inverted operation, print only those that _do not match_ pattern, so start with $print = 1
 	$print = $v ? 1 : 0;
-	if (!$F) {
-		if (grep { $h =~ /$_/ } @patterns) { $print = ! $print }
-	}
-	else {
+	# fixed string, must be exactly equal
+	if ($F) {
 		if (grep { $h eq $_ } @patterns) { $print = ! $print }
 	}
-	# if matched accordingly, print and reset flag
+	# not fixed string, just need to match somewhere
+	else {
+		if (grep { $h =~ /$_/ } @patterns) { $print = ! $print }
+	}
+	# if matched, print and start over
 	if ($print) {  printf ">%s\n%s\n", $h, $s  };
 }
 
