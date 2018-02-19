@@ -11,12 +11,22 @@ use Getopt::Long;
 my $f = '';    # file with patterns
 my $v = undef; # invert pattern
 my $F = undef; # fixed strings
+my $h = undef; # help
 
 my $usage = "Usage: $0 [options] [pattern] fastafile\n";
 
-GetOptions( 'f=s' => \$f, 'v' => \$v, 'F' => \$F ) or die $usage;
+my $help = "$usage\n";
+$help .= "Options:\n";
+$help .= "    -h          print this help\n";
+$help .= "    -f file     read (addional) patterns from file\n";
+$help .= "    -F          interpret patterns as fixed strings instead of regular expressions\n";
+$help .= "    -v          invert match, to select non-matching sequences\n";
 
-my $infile = pop @ARGV or die;
+GetOptions( 'f=s' => \$f, 'v' => \$v, 'F' => \$F, 'h|help' => \$h ) or die $usage;
+
+if ($h) { print $help and exit }
+
+my $infile = pop @ARGV or die $usage;
 
 my @patterns = @ARGV;
 
@@ -30,12 +40,13 @@ if ($f) {
 	close $fh;
 }
 
+die "Error: no search patterns" unless scalar @patterns;
+
 my $fh = Seqload::Fasta->open($infile);
 
 # flag to hold print state
 my $print = 0;
 
-SEQ:
 while (my ($h, $s) = $fh->next_seq()) {
 	# normal operation, print only those that match pattern, so start with $print = 0
 	# inverted operation, print only those that _do not match_ pattern, so start with $print = 1
