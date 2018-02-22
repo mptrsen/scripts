@@ -3,7 +3,6 @@ use strict;
 use warnings;
 use autodie;
 
-use File::Spec;
 use Getopt::Long;
 
 # Removes sequences that do not match the filter pattern, similar to grep.
@@ -28,10 +27,10 @@ $help .= "    -v          invert match, to select non-matching sequences\n";
 Getopt::Long::Configure( qw(no_ignore_case) );
 
 GetOptions(
-	'f|file=s' => \$f,
-	'v|invert-match' => \$v,
+	'f|file=s'        => \$f,
+	'v|invert-match'  => \$v,
 	'F|fixed-strings' => \$F,
-	'h|help' => \$h,
+	'h|help'          => \$h,
 ) or die $usage;
 
 if ($h) { print $help and exit }
