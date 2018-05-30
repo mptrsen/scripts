@@ -60,9 +60,9 @@ while (my ($h, $s) = $fh->next_seq()) {
 	# normal operation, print only those that match pattern, so start with $print = 0
 	# inverted operation, print only those that _do not match_ pattern, so start with $print = 1
 	$print = $v ? 1 : 0;
-	# fixed string, must be exactly equal
+	# fixed string, must be a substring
 	if ($F) {
-		if (grep { $h eq $_ } @patterns) { $print = ! $print }
+		if (grep { index($h, $_) != -1 } @patterns) { $print = ! $print }
 	}
 	# not fixed string, just need to match somewhere
 	else {
