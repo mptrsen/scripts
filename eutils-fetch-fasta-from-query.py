@@ -2,29 +2,47 @@
 
 import requests
 import xml.etree.ElementTree as etree
+import argparse
 import sys
 
+# parse command line arguments
+parser = argparse.ArgumentParser()
+parser.add_argument('-m', '--max',  action = 'store', dest = 'retmax', type = int,  default = 100,       help = 'Maximum number of entries. Default: 100')
+parser.add_argument('-d', '--db',   action = 'store', dest = 'db',     type = str,  default = 'nuccore', help = 'Database to search. Default: nuccore')
+parser.add_argument('-t', '--type', action = 'store', dest = 'rettype', type = str, default = 'fasta',   help = 'Return type. Default: fasta')
+parser.add_argument('search_terms', nargs = '+',      help = 'Search terms')
+args = parser.parse_args()
+
+# some variables
 base_url = 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils'
-esearch = base_url + '/esearch.fcgi'
-efetch = base_url + '/efetch.fcgi'
-db = 'nuccore'
+esearch  = base_url + '/esearch.fcgi'
+efetch   = base_url + '/efetch.fcgi'
+db       = args.db
+rettype  = args.rettype
+retmax   = args.retmax
+term     = '+'.join(args.terms)
 
-# stitch together the query
-term = '+AND+'.join(sys.argv[1:])
+sys.stderr.write("Searching for: %s\n" % ' '.join(args.terms))
 
-query = 'db=' + db + '&term=' + term
-
-url = esearch + '?' + query
-
+# esearch request
+url   = "%s?db=%s&retmax=%d&term=%s" % (esearch, db, retmax, term)
+sys.stderr.write("Request: %s\n" % url)
 r = requests.get(url)
 
-doc = etree.fromstring(r.text)
+# parse XML
+doc     = etree.fromstring(r.text)
+IdList  = doc.findall('./IdList/Id')
 
-id_list = doc.findall('./IdList/Id')
+# exit now if nothing returned
+if len(IdList) == 0:
+    sys.stderr.write("Nothing found.\n")
+    sys.exit(1)
 
-for id in id_list:
-    url = efetch + '?db=' + db + '&rettype=fasta&id=' + id.text
-    r = requests.get(url)
-    print(r.text.strip())
+# fetch fasta for each id: make comma-separated id list
+ids = ','.join( [ Id.text for Id in IdList ] )
 
-
+# efetch them all in one go and print
+url = "%s?db=%s&rettype=%s&id=%s" % (efetch, db, rettype, ids)
+sys.stderr.write("Request: %s\n" % url)
+r   = requests.get(url)
+print(r.text.replace("\n\n", "\n").strip())
