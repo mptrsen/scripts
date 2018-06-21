@@ -1,9 +1,10 @@
 #!/bin/bash
 
-# This script rips series from DVD to Matroshka format. It uses HandBrakeCLI,
-# which must be installed. Do not use the version in the repositories as they
-# are horribly outdated and broken. You can get HandBrakeCLI for Ubuntu-based
-# system by adding this PPA from the author:
+# This script rips series from DVD to Matroshka format (including subtitles as
+# separate tracks). It uses HandBrakeCLI, which must be installed. Do not use
+# the version in the repositories as they are horribly outdated and broken. You
+# can get the recent version of HandBrakeCLI for Ubuntu-based systems by adding
+# this PPA from the author:
 #
 #   add-apt-repository ppa:stebbins/handbrake-releases
 #   apt-get update
@@ -11,7 +12,7 @@
 #
 # Usage:
 # 
-#   rip-serie.sh -t "Title of the series" -s X -e Y [OPTIONS]
+#   serien-ripper.sh -t "Title of the series" -s X -e Y [OPTIONS]
 #
 # Where X is the season and Y the number of episodes in the series.
 # Options follow.
@@ -33,8 +34,8 @@ Mandatory parameters:
 Optional parameters:
 
 	-1, --start-episode N
-		Set starting episode. Must be integer. Useful if you want to start ripping
-		in the middle. Defaults to 1.
+		(yes, that's a one.) Set starting episode. Must be integer. Useful if you
+		want to start ripping in the middle. Defaults to 1.
 	-d, --dvd-device DVD-DEVICE
 		Set DVD device. Defaults to /dev/cdrom.
 	-l, --languages LANGUAGES
@@ -44,7 +45,7 @@ Optional parameters:
 		Episodes per DVD. The script will eject the DVD and ask for the next one
 		after each N episodes. Defaults to 2.
 	-p, --preset-file PRESET_FILE
-		HandBrake preset file. No default.
+		HandBrake preset file. Usually not needed. No default.
 "
 
 #
