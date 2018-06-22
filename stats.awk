@@ -30,12 +30,24 @@ END {
 	}
 	stdev = sqrt(sqdiff/NR)
 	N50 = n50(c)
+	N90 = n90(c)
 
 	# output
-	printf("%-12s %-14s %-12s %-12s %-12s %-12s %-12s %-12s %-12s %-12s\n", "n", "sum", "min", "lower", "mean", "median", "upper", "max", "stdev", "N50")
-	printf("%-12s %-14s %-12s %-12s %-12s %-12s %-12s %-12s %-12s %-12s\n", r("-", 12), r("-", 14), r("-", 12), r("-", 12), r("-", 12), r("-", 12), r("-", 12), r("-", 12), r("-", 12), r("-", 12))
-	printf("%-12d %-14f %-12f %-12f %-12f %-12f %-12f %-12f %-12f %-12f\n",  n,   sum,   Q0,    Q1,      mean,   Q2,       Q3,      Q4,    stdev,   N50)
-	print "---" * 15
+	len_n = length(n)
+	len_sum = length(sprintf("%s", sum))
+	len_Q0 = length(sprintf("%s", Q0))
+	len_Q1 = length(sprintf("%s", Q1))
+	len_Q2 = length(sprintf("%s", Q2))
+	len_Q3 = length(sprintf("%s", Q3))
+	len_Q4 = length(sprintf("%s", Q4))
+	len_mean = length(sprintf("%s", mean))
+	len_stdev = length(sprintf("%s", stdev))
+	len_N50 = length(sprintf("%s", N50))
+	len_N90 = length(sprintf("%s", N90))
+	format = "%-" len_n "s %-" len_sum "s %-" len_Q0 "s %-" len_Q1 "s %-" len_mean "s %-" len_Q2 "s %-" len_Q3 "s %-" len_Q4 "s %-" len_stdev "s %-" len_N50 "s %-" len_N90 "s\n"
+	printf(format, "n",           "sum",           "min",           "lower",       "mean",           "median",       "upper",        "max",          "stdev",           "N50",           "N90")
+	printf(format, r("-", len_n), r("-", len_sum), r("-", len_Q0), r("-", len_Q1), r("-", len_mean), r("-", len_Q2), r("-", len_Q3), r("-", len_Q4), r("-", len_stdev), r("-", len_N50), r("-", len_N90))
+	printf(format, n,             sum,             Q0,              Q1,            mean,             Q2,             Q3,             Q4,             stdev,             N50,             N90)
 }
 
 function r(s, n) {
@@ -47,13 +59,22 @@ function r(s, n) {
 }
 
 function n50(nums) {
+	return nX(50, nums)
+}
+
+function n90(nums) {
+	return nX(90, nums)
+}
+
+function nX(X, nums) {
+	fraction = X / 100
 	total = 0
 	for (i = 1; i < length(nums); i++) {
 		total += nums[i]
 	}
 	subtotal = 0
 	for (i = 1; i < length(nums); i++) {
-		if (nums[i] + subtotal > total / 2) {
+		if (nums[i] + subtotal > total * fraction) {
 			return nums[i]
 		}
 		else {
