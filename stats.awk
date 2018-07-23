@@ -45,7 +45,7 @@ END {
 	len_N50 = length(sprintf("%s", N50))
 	len_N90 = length(sprintf("%s", N90))
 	format = "%-" len_n "s %-" len_sum "s %-" len_Q0 "s %-" len_Q1 "s %-" len_mean "s %-" len_Q2 "s %-" len_Q3 "s %-" len_Q4 "s %-" len_stdev "s %-" len_N50 "s %-" len_N90 "s\n"
-	printf(format, "n",           "sum",           "min",           "lower",       "mean",           "median",       "upper",        "max",          "stdev",           "N50",           "N90")
+	printf(format, "n",           "sum",           "min",           "lowr",       "mean",           "medn",       "uppr",        "max",          "stdev",           "N50",           "N90")
 	printf(format, r("-", len_n), r("-", len_sum), r("-", len_Q0), r("-", len_Q1), r("-", len_mean), r("-", len_Q2), r("-", len_Q3), r("-", len_Q4), r("-", len_stdev), r("-", len_N50), r("-", len_N90))
 	printf(format, n,             sum,             Q0,              Q1,            mean,             Q2,             Q3,             Q4,             stdev,             N50,             N90)
 }

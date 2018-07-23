@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-from html.parser import HTMLParser
+from HTMLParser import HTMLParser
 import fileinput
 
 class MLStripper(HTMLParser):
