@@ -17,31 +17,35 @@ set -e
 
 SPECIES='SPECIES_NAME'
 INPUTFILE='GENOMEFILE'
-LIBRARY_FILE="PATH_TO_REPEAT_LIBRARY" # will look for library in RepeatModeler output directory if this does not exist
-CLADE="Metazoa" # RepBase will be included using this as taxonomy query
+LIBRARY_FILE='PATH_TO_REPEAT_LIBRARY' # will look for library in RepeatModeler output directory if this does not exist
+BLAST_OUTPUT_FILE='PATH_TO_BLAST_OUTPUT_FILE'
+CLADE='Metazoa' # RepBase will be included using this as taxonomy query
 PREFIX='/share/pool/malte/analyses/results/te-annotation' # used to compose output directory by appending SPECIES
+DRY_RUN=0
 RUN_MODELER=1
+FILTER_LIBRARY=1
 RUN_MASKER=1
 MAKE_LANDSCAPE=1
-DRY_RUN=0
 
 ####################################
 # Program paths                    #
 ####################################
 
-PERL=/opt/perl/bin/perl
-RMASKER_DIR=/share/scientific_bin/RepeatMasker/4.0.7
-RMODELER_DIR=/share/scientific_bin/RepeatModeler/open-1.0.10bugfix
-LANDSCAPEPARSER=/home/mpetersen/scripts/parse-repeatmasker-landscapes-to-table.pl
+PERL='/opt/perl/bin/perl'
+RMASKER_DIR='/share/scientific_bin/repeatmasker/4.0.7'
+RMODELER_DIR='/share/scientific_bin/RepeatModeler/open-1.0.10bugfix'
+LANDSCAPEPARSER='/home/mpetersen/scripts/parse-repeatmasker-landscapes-to-table.pl'
+LIBRARYFILTER='/share/pool/malte/analyses/code/reallyrepeats.sh'
+FASTAGREP='/home/mpetersen/scripts/fastagrep.pl'
 
 ####################################
 # Number of threads                #
 ####################################
 
 # because of a bug in RModeler that is related to RMBLAST,
-# we must halve the number of threads and still be above 1,
-# so the job must be submitted with at least 4 slots
-NCPU=${NSLOTS:=1} # use number of slots from `-pe orte` submission or default to 1
+# the job must be submitted with at least 4 slots
+# so divide NSLOTS by 4
+NCPU=${NSLOTS:=4} # use number of slots from `-pe orte` submission or default to 4
 let NCPU_RMBLAST=$NCPU/4
 if [[ $NCPU_RMBLAST -lt 1 ]]; then
 	die "Fatal: RMBLAST requires at least 4 cores, but you gave this only $NCPU"
@@ -95,8 +99,8 @@ function run-modeler {
 	# create soft link to input genome file
 	echo "## linking input file '$GENOME'"
 	if [[ ! -f "$GENOME" ]]; then die "Fatal: $GENOME does not exist"; fi
-	if [[ -L "$GENOME_BASENAME" ]]; then rm "$GENOME_BASENAME"; fi
-	ln -s "$GENOME"
+	if [[ -L "$GENOME_BASENAME" ]]; then run-command rm "$GENOME_BASENAME"; fi
+	run-command ln -s "$GENOME"
 
 	echo "## RepeatModeler started $(date --rfc-3339=seconds)"
 
@@ -106,6 +110,23 @@ function run-modeler {
 	run-command "$RMODELER_DIR/RepeatModeler" -pa $NCPU_RMBLAST -engine ncbi -database "$DB" || return 1
 
 	echo "## RepeatModeler done $(date --rfc-3339=seconds)"
+}
+
+#######################################################
+# Filtering the repeat library based on BLAST results #
+#######################################################
+
+function filter-library {
+	if [[ $# -lt 1 ]]; then
+		echo "Usage: filter-library LIBRARY [BLAST_OUTPUT]"
+		exit 1
+	fi
+	LIB="$1"
+	BLASTOUT="$2"
+	echo "## Filtering repeat library"
+	mkdir -p "$PREFIX/$SPECIES/filtered-library"
+	cd "$PREFIX/$SPECIES/filtered-library"
+	run-command /bin/bash $LIBRARYFILTER -n $NCPU $LIB $BLASTOUT
 }
 
 ####################################
@@ -130,12 +151,12 @@ function run-masker {
 	cd "$MASKER_WORKDIR"
 
 	echo "## linking input file '$GENOME'"
-	if test -L "$GENOME_BASENAME"; then rm "$GENOME_BASENAME"; fi
-	ln -s "$GENOME" || return 1
+	if [[ -L "$GENOME_BASENAME" ]]; then run-command rm "$GENOME_BASENAME"; fi
+	run-command ln -s "$GENOME" || return 1
 
 	echo "## Combining $CLADE RepBase and species-specific repeat library into '$COMBINED_LIB'"
 	run-command "$RMASKER_DIR/util/queryRepeatDatabase.pl" --clade --species "$CLADE" > "$COMBINED_LIB" || return 1
-	cat $LIB >> $COMBINED_LIB
+	run-command cat $LIB >> $COMBINED_LIB
 
 	echo "## RepeatMasker started on '$GENOME_BASENAME' $(date --rfc-3339=seconds)"
 	run-command $PERL "$RMASKER_DIR/RepeatMasker" -engine ncbi -par $NCPU -a -xsmall -gff -lib "$COMBINED_LIB" "$GENOME_BASENAME" || return 1
@@ -159,6 +180,7 @@ function post-process {
 	DIV="$SPECIES.div"
 	LANDSCAPE="$SPECIES-repeat-landscape.html"
 	LANDSCAPE_TABLE="$SPECIES-repeat-landscape-data.txt"
+	LANDSCAPE_COVERAGE_TABLE="$SPECIES-repeat-landscape-coverage.txt"
 	SUMMARY_TABLE="$SPECIES-summary.tbl"
 	GENOME_BASENAME=$(basename "$INPUTFILE")
 
@@ -177,13 +199,17 @@ function post-process {
 	run-command $PERL "$RMASKER_DIR/util/calcDivergenceFromAlign.pl" -s "$DIV" "$RMASKER_OUTPUT_CATFILE" || return 1
 
 	echo "## creating repeat landscape into '$LANDSCAPE'"
-	run-command $PERL "$RMASKER_DIR/util/createRepeatLandscape.pl" -div "$DIV" > "$LANDSCAPE" || return 1
+	MASKER_TABLE="$OUTPUT_DIRECTORY/repeatmasker/$(basename "$INPUTFILE").tbl"
+	GENOME_SIZE=$(grep 'total length:' "$MASKER_TABLE" | awk '{print $3}')
+	run-command $PERL "$RMASKER_DIR/util/createRepeatLandscape.pl" -div "$DIV" -g $GENOME_SIZE > "$LANDSCAPE" || return 1
 
 	echo "## parsing landscape table"
 	run-command $PERL "$LANDSCAPEPARSER" "$LANDSCAPE" > "$LANDSCAPE_TABLE" || return 1
 
+	echo "## landscape coverage data in $LANDSCAPE_COVERAGE_TABLE"
+
 	echo "## Generating species-specific summary"
-	run-command $PERL "$RMASKER_DIR/util/buildSummary.pl" -species "$SPECIES" -useAbsoluteGenomeSize "$RMASKER_OUTPUT_OUTFILE" > "$SUMMARY_TABLE"
+	#run-command $PERL "$RMASKER_DIR/util/buildSummary.pl" -species "$SPECIES" -useAbsoluteGenomeSize "$RMASKER_OUTPUT_OUTFILE" > "$SUMMARY_TABLE"
 }
 
 
@@ -193,20 +219,59 @@ function post-process {
 
 echo "## BEGIN $(date --rfc-3339=seconds)"
 
+echo "## Running on queue '$QUEUE' with $NCPU CPUs"
+echo "## Parameters:"
+echo "## - Working directory: $PREFIX/$SPECIES"
+echo "## - Input file: $INPUTFILE"
+echo "## - Library file: $LIBRARY_FILE"
+echo "## - BLAST output file: $BLAST_OUTPUT_FILE"
+echo "## - Repbase taxonomic level: $CLADE"
+echo -n "## - Running RepeatModeler: ";    if [[ $RUN_MODELER -ne 0    ]]; then echo 'yes'; else echo 'no'; fi
+echo -n "## - Filtering repeat library: "; if [[ $FILTER_LIBRARY -ne 0 ]]; then echo 'yes'; else echo 'no'; fi
+echo -n "## - Running RepeatMasker: ";     if [[ $RUN_MASKER -ne 0     ]]; then echo 'yes'; else echo 'no'; fi
+echo -n "## - Running Post-processor: ";   if [[ $MAKE_LANDSCAPE -ne 0 ]]; then echo 'yes'; else echo 'no'; fi
+
 if [[ $DRY_RUN -ne 0 ]]; then
-	echo "## This is a dry run: commands will be echoed on standard error but not actually executed"
+	echo "# This is a dry run: commands will be echoed on standard error but not actually executed"
 fi
 
 echo "## Testing dependencies..."
 test-if-programs-exist $RMODELER_DIR/BuildDatabase $RMODELER_DIR/RepeatModeler $RMASKER_DIR/RepeatMasker
 
 OUTPUT_DIRECTORY="$PREFIX/$SPECIES"
+run-command mkdir -p "$OUTPUT_DIRECTORY"
+run-command cd "$OUTPUT_DIRECTORY"
 
 # uncompress input file if gzipped
-if [[ "$INPUTFILE" =~ \.gz$ || -f "$INPUTFILE".gz ]]; then
-	echo "## uncompressing input file"
-	gunzip "$INPUTFILE" || die "Fatal: Could not uncompress gzipped genome file"
-	INPUTFILE=${INPUTFILE%.gz} # remove .gz suffix
+if [[ "$INPUTFILE" =~ \.gz$ ]]; then
+	if [[ -f "$INPUTFILE" ]]; then
+		# file exists zipped where specified, unzip
+		echo "## uncompressing input file"
+		gunzip "$INPUTFILE" || die "Fatal: Could not uncompress gzipped genome file"
+		INPUTFILE=${INPUTFILE%.gz} # remove .gz suffix
+	elif [[ -f "${INPUTFILE%.gz}" ]]; then
+		# already unzipped, just remove suffix
+		INPUTFILE="${INPUTFILE%.gz}"
+		echo "## Using unzipped input file $INPUTFILE"
+	else 
+		# not there
+		die "Fatal: Input file not found: $INPUTFILE"
+	fi
+# or bzip2'ed
+elif [[ "$INPUTFILE" =~ \.bz2$ ]]; then
+	if [[ -f "$INPUTFILE" ]]; then
+		# file exists zipped where specified, unzip
+		echo "## uncompressing input file"
+		bunzip2 "$INPUTFILE" || die "Fatal: Could not uncompress bz2ipped genome file"
+		INPUTFILE=${INPUTFILE%.bz2} # remove .bz2 suffix
+	elif [[ -f "${INPUTFILE%.bz2}" ]]; then
+		# already unzipped, just remove suffix
+		INPUTFILE="${INPUTFILE%.bz2}"
+		echo "## Using unzipped input file $INPUTFILE"
+	else 
+		# not there
+		die "Fatal: Input file not found: $INPUTFILE"
+	fi
 fi
 
 # run RepeatModeler if requested
@@ -220,10 +285,25 @@ if [[ -f $LIBRARY_FILE || $DRY_RUN -ne 0 ]]; then
 	REPEAT_LIBRARY=$LIBRARY_FILE
 else
 	echo "## Repeat library unspecified or not found, searching in output directory $OUTPUT_DIRECTORY"
-	REPEAT_LIBRARY=$(find "$OUTPUT_DIRECTORY/repeatmodeler" -maxdepth 2 -name "*.classified" -or -name '*-rm-families.fa' | head  -n 1) # don't care which one, they are identical
+	if [[ -d "$OUTPUT_DIRECTORY/filtered-library" ]]; then
+		REPEAT_LIBRARY=$(find "$OUTPUT_DIRECTORY/filtered-library" -name 'filtered-library.fa')
+	else
+		REPEAT_LIBRARY=$(find "$OUTPUT_DIRECTORY/repeatmodeler" -maxdepth 2 -name "*.classified" -or -name '*-rm-families.fa' | head  -n 1) # don't care which one, they are identical
+	fi
 	test -f "$REPEAT_LIBRARY" || die "Fatal: Repeat library not found" # exit if unset
 fi
 echo "## Repeat library: '$REPEAT_LIBRARY'"
+
+# filter repeat library if requested
+if [[ $FILTER_LIBRARY -ne 0 ]]; then
+	if [[ -f $BLAST_OUTPUT_FILE ]]; then
+		filter-library "$REPEAT_LIBRARY" "$BLAST_OUTPUT_FILE" || die "Fatal: filtering repeat library failed"
+	else
+		filter-library "$REPEAT_LIBRARY" || die "Fatal: filtering repeat library failed"
+	fi
+	REPEAT_LIBRARY="$OUTPUT_DIRECTORY/filtered-library/filtered-library.fa"
+	echo "## Filtered repeat library: $REPEAT_LIBRARY"
+fi
 
 # run RepeatMasker if requested
 if [[ $RUN_MASKER -ne 0 ]]; then
@@ -239,9 +319,9 @@ if [[ "$MAKE_LANDSCAPE" -ne 0 ]]; then
 fi
 
 # re-gzip the input file to save space
-gzip "$INPUTFILE"
+run-command gzip "$INPUTFILE"
 
 echo "## Summary table: '$MASKER_TABLE'"
-cat "$MASKER_TABLE"
+run-command cat "$MASKER_TABLE"
 
 echo "## END $(date --rfc-3339=seconds)"
