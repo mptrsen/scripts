@@ -34,16 +34,27 @@ END {
 
 	# output
 	len_n = length(n)
-	len_sum = length(sprintf("%s", sum))
-	len_Q0 = length(sprintf("%s", Q0))
-	len_Q1 = length(sprintf("%s", Q1))
-	len_Q2 = length(sprintf("%s", Q2))
-	len_Q3 = length(sprintf("%s", Q3))
-	len_Q4 = length(sprintf("%s", Q4))
-	len_mean = length(sprintf("%s", mean))
+	len_sum   = length(sprintf("%s", sum))
+	len_Q0    = length(sprintf("%s", Q0))
+	len_Q1    = length(sprintf("%s", Q1))
+	len_Q2    = length(sprintf("%s", Q2))
+	len_Q3    = length(sprintf("%s", Q3))
+	len_Q4    = length(sprintf("%s", Q4))
+	len_mean  = length(sprintf("%s", mean))
 	len_stdev = length(sprintf("%s", stdev))
-	len_N50 = length(sprintf("%s", N50))
-	len_N90 = length(sprintf("%s", N90))
+	len_N50   = length(sprintf("%s", N50))
+	len_N90   = length(sprintf("%s", N90))
+	# make the length fit nicely
+	len_sum   = len_sum > 3   ? len_sum   : 3 # sum
+	len_Q0    = len_Q0 > 3    ? len_Q0    : 3 # min
+	len_Q1    = len_Q1 > 4    ? len_Q1    : 4 # Q1
+	len_Q2    = len_Q2 > 4    ? len_Q2    : 4 # median
+	len_Q3    = len_Q3 > 4    ? len_Q3    : 4 # Q3
+	len_Q4    = len_Q4 > 3    ? len_Q4    : 3 # max
+	len_mean  = len_mean > 4  ? len_mean  : 4 # mean
+	len_stdev = len_stdev > 5 ? len_stdev : 5 # stdev
+	len_N50   = len_N50 > 3   ? len_N50   : 3 # N50
+	len_N90   = len_N90 > 3   ? len_N90   : 3 # N90
 	format = "%-" len_n "s %-" len_sum "s %-" len_Q0 "s %-" len_Q1 "s %-" len_mean "s %-" len_Q2 "s %-" len_Q3 "s %-" len_Q4 "s %-" len_stdev "s %-" len_N50 "s %-" len_N90 "s\n"
 	printf(format, "n",           "sum",           "min",           "lowr",       "mean",           "medn",       "uppr",        "max",          "stdev",           "N50",           "N90")
 	printf(format, r("-", len_n), r("-", len_sum), r("-", len_Q0), r("-", len_Q1), r("-", len_mean), r("-", len_Q2), r("-", len_Q3), r("-", len_Q4), r("-", len_stdev), r("-", len_N50), r("-", len_N90))
