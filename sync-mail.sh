@@ -15,6 +15,4 @@
 #    You should have received a copy of the GNU General Public License
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-ping -c 1 imap.gmail.com         && mbsync sternsegler
-ping -c 1 mail.uni-bonn.de       && mbsync uni-bonn
-ping -c 1 sgnimap.senckenberg.de && mbsync senckenberg
+ping -c 1 imap.gmail.com         && mbsync -a 2> $HOME/Mail/mbsync.log
