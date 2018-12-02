@@ -87,7 +87,9 @@ gnuplot
 gnutls-bin
 graphviz
 htop
+id3v2
 imagemagick
+imapfilter
 inkscape
 irssi
 jq
@@ -104,6 +106,7 @@ libssl-dev
 libxml2-dev
 lmodern
 lynx
+mbsync
 mc
 mplayer
 msmtp
@@ -130,6 +133,7 @@ tree
 urlview
 vim-gtk
 vim-latexsuite
+vorbis-tools
 whois
 xboard
 youtube-dl
@@ -199,4 +203,7 @@ titlesec
 sourcecodepro
 minifp
 import
+lastpage
+tabulary
+multirow
 __END_TEXLIVE_PACKAGES__

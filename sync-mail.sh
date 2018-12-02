@@ -15,4 +15,4 @@
 #    You should have received a copy of the GNU General Public License
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-ping -c 1 imap.gmail.com         && mbsync -a 2> $HOME/Mail/mbsync.log
+ping -c 1 imap.gmail.com         && mbsync -a 2>> $HOME/Mail/mbsync.log
