@@ -72,6 +72,7 @@ autoconf
 automake
 build-essential
 claws-mail
+cmake
 conky
 ctags
 curl
@@ -193,6 +194,10 @@ tlpdbopt_w32_multi_user 1
 __END_TEXLIVE_PROFILE__
 
 __BEGIN_TEXLIVE_PACKAGES__
+currvita
+sectsty
+breakurl
+enumitem
 appendix
 lettrine
 textpos
