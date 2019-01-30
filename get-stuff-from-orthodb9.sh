@@ -33,7 +33,7 @@ if [ $# -ne 1 ]; then
 	exit 1
 fi
 URL=$1
-if [[ ! "$URL" =~ ^http://www.orthodb.org/ ]]; then
+if [[ ! "$URL" =~ ^https://www.orthodb.org/ ]]; then
 	echo "Not a valid OrthoDB URL: '$URL'"
 	exit 1
 fi
