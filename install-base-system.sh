@@ -10,7 +10,7 @@
 script_path=$0
 
 echo "Removing the stupid backspace mapping for Colemak keyboard layout"
-sed -i -e 's/BackSpace,\s\+BackSpace,/d' /usr/share/X11/xkb/symbols/us
+sed -i -e '/BackSpace,\s\+BackSpace,/d' /usr/share/X11/xkb/symbols/us
 
 # normal packages from the base repo
 read -n 1 -p "Install the base packages? [y/n] "
