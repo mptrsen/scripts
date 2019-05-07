@@ -12,6 +12,7 @@ use Getopt::Long;
 my $f = undef; # file with patterns
 my $v = undef; # invert pattern
 my $F = undef; # fixed strings
+my $m = undef; # max matches
 my $h = undef; # help
 
 my $usage = "Usage: $0 [options] [pattern] fastafile\n";
@@ -30,6 +31,7 @@ GetOptions(
 	'f|file=s'        => \$f,
 	'v|invert-match'  => \$v,
 	'F|fixed-strings' => \$F,
+	'm|max-count=i'   => \$m,
 	'h|help'          => \$h,
 ) or die $usage;
 
@@ -56,6 +58,9 @@ my $fh = Seqload::Fasta->open($infile);
 # flag to hold print state
 my $print = 0;
 
+# hit counter
+my $counter = 0;
+
 while (my ($h, $s) = $fh->next_seq()) {
 	# normal operation, print only those that match pattern, so start with $print = 0
 	# inverted operation, print only those that _do not match_ pattern, so start with $print = 1
@@ -69,7 +74,10 @@ while (my ($h, $s) = $fh->next_seq()) {
 		if (grep { $h =~ /$_/ } @patterns) { $print = ! $print }
 	}
 	# if matched, print and start over
-	if ($print) {  printf ">%s\n%s\n", $h, $s  };
+	if ($print) {
+		printf ">%s\n%s\n", $h, $s;
+		last if (++$counter >= $m);
+	};
 }
 
 

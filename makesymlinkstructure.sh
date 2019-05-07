@@ -38,7 +38,14 @@ fi
 
 # clear existing directory structure
 echo "Clearing existing directory structure..."
-rm -rf /var/data/graduateschool/data/by-*
+if [ -e "$PREFIX/by-species" ]; then
+	chmod -R +w "$PREFIX/by-species"
+	find "$PREFIX/by-species" -type l -delete
+fi
+if [ -e "$PREFIX/by-type"    ]; then
+	chmod -R +w "$PREFIX/by-type"
+	find "$PREFIX/by-type" -type l -delete
+fi
 
 # all lines that aren't commented out in the input file: get the relevant columns
 grep -v '^#' $1 | cut -f 1,2,3,6,7,9,10,11 | while read SPECIES TYPE LIBSIZE USER HOST PROJECT DIR FILES; do
@@ -89,9 +96,4 @@ grep -v '^#' $1 | cut -f 1,2,3,6,7,9,10,11 | while read SPECIES TYPE LIBSIZE USE
 	fi
 done
 
-#echo "Fixing permissions"
-#find "$PREFIX/by-species" -type l -exec chmod 444 {} \; # links
-#find "$PREFIX/by-species" -type d -exec chmod 555 {} \; # dirs
-#find "$PREFIX/by-type"    -type l -exec chmod 444 {} \; # links
-#find "$PREFIX/by-type"    -type d -exec chmod 555 {} \; # dirs
 echo "Done"

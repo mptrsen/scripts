@@ -9,6 +9,9 @@
 
 script_path=$0
 
+echo "Removing the stupid backspace mapping for Colemak keyboard layout"
+sed -i -e 's/BackSpace,\s\+BackSpace,/d' /usr/share/X11/xkb/symbols/us
+
 # normal packages from the base repo
 read -n 1 -p "Install the base packages? [y/n] "
 echo
@@ -56,14 +59,13 @@ if [[ "$REPLY" = 'y' ]]; then
 	echo "## TeX Live $year installed"
 	echo "## Installing additional TeX packages"
 	sed -ne '1,/^__BEGIN_TEXLIVE_PACKAGES__/d;/^__END_TEXLIVE_PACKAGES__/,$d;p' $script_path | xargs tlmgr install {} \;
+	# return to previous directory. This is actually important
+	# so the package list and texlive profile at the end don't get mixed up with
+	# the code
+	cd - > /dev/null
 	echo "## Done"
 fi
 
-# return to previous directory and exit the script. This is actually important
-# so the package list and texlive profile at the end don't get mixed up with
-# the code
-
-cd - > /dev/null
 echo '## All done. Bye!'
 exit 0 # end the script!
 
@@ -93,6 +95,7 @@ imagemagick
 imapfilter
 inkscape
 irssi
+isync
 jq
 lftp
 libboost-all-dev
@@ -107,7 +110,6 @@ libssl-dev
 libxml2-dev
 lmodern
 lynx
-mbsync
 mc
 mplayer
 msmtp
@@ -198,17 +200,25 @@ currvita
 sectsty
 breakurl
 enumitem
+environ
 appendix
 lettrine
 textpos
 quotchap
+tabu
 tocloft
 titling
 titlesec
 sourcecodepro
+makecell
 minifp
 import
 lastpage
 tabulary
 multirow
+threeparttable
+threeparttablex
+trimspaces
+varwidth
+wrapfig
 __END_TEXLIVE_PACKAGES__

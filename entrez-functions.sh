@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2018, Malte Petersen <mptrsen@uni-bonn.de>
+# Copyright 2019, Malte Petersen <mptrsen@uni-bonn.de>
 #
 #    This program is free software: you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
@@ -15,4 +15,28 @@
 #    You should have received a copy of the GNU General Public License
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-ping -c 1 imap.gmail.com > /dev/null      && mbsync -a 2>> $HOME/Mail/mbsync.log
+baseurl='https://eutils.ncbi.nlm.nih.gov/entrez/eutils'
+
+function esearch {
+	db=${1}
+	shift
+	IFS='+'
+	term="${*}"
+	url="$baseurl/esearch.fcgi?db=${db}&term=${term}&rettype=count&retmode=json" 
+	echo "## Search URL: ${url}"
+	curl -s "${url}"
+}
+
+function efetch {
+	db=${1}
+	shift
+	IFS=','
+	ids="${*}"
+	url="$baseurl/efetch.fcgi?db=${db}&rettype=fasta&retmode=text&id=${ids}"
+	echo "## Search URL: ${url}"
+	curl -s "${url}"
+}
+
+function striptags {
+	sed -e 's/<[^>]\+>//g'
+}
