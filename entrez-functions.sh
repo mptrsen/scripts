@@ -19,22 +19,43 @@ baseurl='https://eutils.ncbi.nlm.nih.gov/entrez/eutils'
 
 function esearch {
 	db=${1}
+	rettype=${2}
 	shift
 	IFS='+'
 	term="${*}"
-	url="$baseurl/esearch.fcgi?db=${db}&term=${term}&rettype=count&retmode=json" 
-	echo "## Search URL: ${url}"
+	url="$baseurl/esearch.fcgi?db=${db}&term=${term}&rettype=${rettype}&retmode=json" 
+	echo "## Search URL: ${url}" > /dev/stderr
 	curl -s "${url}"
+}
+
+function esearch2count {
+	db=${1}
+	term="${*}"
+	esearch $db count $term
+}
+
+function esearch2id {
+	db=${1}
+	term="${*}"
+	esearch $db uilist $term
 }
 
 function efetch {
 	db=${1}
-	shift
+	rettype=${2}
+	shift 2
 	IFS=','
 	ids="${*}"
-	url="$baseurl/efetch.fcgi?db=${db}&rettype=fasta&retmode=text&id=${ids}"
-	echo "## Search URL: ${url}"
+	url="$baseurl/efetch.fcgi?db=${db}&rettype=${rettype}&retmode=text&id=${ids}"
+	echo "## Search URL: ${url}" > /dev/stderr
 	curl -s "${url}"
+}
+
+function efetch2fasta {
+	db=${1}
+	shift
+	ids="${*}"
+	efetch $db fasta $ids | sed -e '/^$/d'
 }
 
 function striptags {

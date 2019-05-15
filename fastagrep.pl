@@ -76,7 +76,7 @@ while (my ($h, $s) = $fh->next_seq()) {
 	# if matched, print and start over
 	if ($print) {
 		printf ">%s\n%s\n", $h, $s;
-		last if (++$counter >= $m);
+		last if (defined $m and ++$counter >= $m);
 	};
 }
 
