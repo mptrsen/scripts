@@ -3,10 +3,10 @@
 # get the latest search results from NCBI PubMed for a list of queries,
 # mail them to me
 
-queries="transposable+element transposon"
-smtp="smtp=smtp.uni-bonn.de"
-fromaddr="mptrsen@uni-bonn.de"
-toaddr="mptrsen@uni-bonn.de"
+queries="transposable+element transposon nanopore"
+smtp="smtp=smtp.mailbox.org"
+fromaddr="malte.petersen@senckenberg.de"
+toaddr="malte.petersen@senckenberg.de"
 age=7
 outdir="/var/tmp/pubmed-results"
 baseurl='https://eutils.ncbi.nlm.nih.gov/entrez/eutils'
