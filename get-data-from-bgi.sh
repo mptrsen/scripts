@@ -1,15 +1,19 @@
 #!/bin/bash
 
+set -e
+set -o nounset
+set -o pipefail
+
 # make sure we have enough arguments
-if [ $# -lt 3 ]; then
+if [[ $# -lt 3 ]]; then
 	echo "Error: must be called with 3 args (HOST, USER, PASS) and 1 optional arg (DIRECTORY_PREFIX)"
 	exit 1
 fi
 # optional: get prefix from fourth argument or fall back to default
-if [ $# -gt 3 ]; then
+if [[ $# -gt 3 ]]; then
 	PREFIX=$4
 else
-	PREFIX="/var/data/graduateschool/data/.store/gbr"
+	PREFIX="/gendata_aj/mpetersen/data"
 fi
 
 HOST=$1
