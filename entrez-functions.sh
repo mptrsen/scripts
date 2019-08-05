@@ -23,7 +23,7 @@ function esearch {
 	shift
 	IFS='+'
 	term="${*}"
-	url="$baseurl/esearch.fcgi?db=${db}&term=${term}&rettype=${rettype}&retmode=json" 
+	url="$baseurl/esearch.fcgi?db=${db}&term=${term}&rettype=text&retmode=json" 
 	echo "## Search URL: ${url}" > /dev/stderr
 	curl -s "${url}"
 }
