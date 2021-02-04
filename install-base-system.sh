@@ -7,6 +7,8 @@
 # - everything I need to compile stuff
 # - git, vim, mutt, etc
 
+set -euo pipefail
+
 script_path=$0
 
 echo "Removing the stupid backspace mapping for Colemak keyboard layout"
