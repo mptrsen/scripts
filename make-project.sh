@@ -21,11 +21,11 @@ touch "$newname/workflow/Snakefile"
 
 echo 'Describe the content of this directory here' > "$newname"/README.md
 
-cat << "EOF" > "$newname"/report.Rmd
+cat << EOF > "$newname"/report.Rmd
 ---
 title: $newname
 author: $(whoami | sed -e 's/^\([a-z]\)/\u\1/')
-date: "`r Sys.Date()`"
+date: "\`r Sys.Date()\`"
 output:
 	html_document:
 		toc: true
