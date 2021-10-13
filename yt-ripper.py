@@ -10,7 +10,12 @@ url = sys.argv[1]
 params = sys.argv[2:]
 
 # Download entire playlist. The JSON files will be important for parsing
-cmd = [ "youtube-dl", "--write-info-json", "{url}".format(url = url) ]
+cmd = [ "youtube-dl",
+        "--extract-audio",
+        "--audio-format", "mp3",
+        "--audio-quality", "192k",
+        "--write-info-json",
+        "{url}".format(url = url) ]
 res = subprocess.run(cmd, capture_output = False)
 
 # Work from the collected mp3 files and associated JSON info dumps
