@@ -68,7 +68,7 @@ playlist_data = download_playlist_json(url)
 
 album = playlist_data["title"]
 album = re.sub("[^\w]", "_", album)
-print("Playlist title: {album}".format(album = album))
+print("# Playlist title: {album}".format(album = album))
 
 # Create new directory, dump the playlist JSON, and change there
 p = Path(album)
@@ -91,9 +91,9 @@ for entry in playlist_data["entries"]:
     else: # one of the necessary files do not exist, re-create JSON, download and tag
         with open(Path(json_file), "w") as f:
             json.dump(entry, f)
-        print("Downloading {title} ({n} of {n_all})".format(title = entry["title"], n = c, n_all = playlist_length))
+        print("Downloading ({n} of {n_all}): {title}".format(title = entry["title"], n = c, n_all = playlist_length))
         download_from_json(json_file)
-    print("Tagging {mp3}".format(mp3 = mp3_file))
+    print("Tagging: {mp3}".format(mp3 = mp3_file))
     res = tag_file(mp3_file, json_file)
     if res != 0: revisit.append(mp3_file)
     print() # empty line for structure
