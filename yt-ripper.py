@@ -9,7 +9,6 @@ from pathlib import Path
 
 def tag_file(mp3_file, json_file):
     # extract data from JSON
-    print("Tagging {mp3}".format(mp3 = mp3_file))
     with open(json_file) as f:
         data   = json.load(f)
         song   = data["title"]
@@ -41,9 +40,6 @@ def tag_file(mp3_file, json_file):
     return problems
 
 def download_from_json(json_file):
-    with open(json_file, "r") as f:
-        info = json.load(f)
-    print("Downloading {title}".format(title = info["title"]))
     ytdl_cmd = [ "youtube-dl",
         "--extract-audio",
         "--audio-format", "mp3",
@@ -53,11 +49,9 @@ def download_from_json(json_file):
     cmd_json = ytdl_cmd + [ "--load-info-json", json_file ]
     res = subprocess.run(cmd_json)
     if res.returncode != 0:
-        print("Error downloading {title}".format(title = info["title"]))
         sys.exit(res.returncode)
 
 def download_playlist_json(url):
-    print("Downloading playlist info for {url}".format(url = url))
     cmd = [ "youtube-dl", "--dump-single-json", url ]
     res = subprocess.run(cmd, capture_output = True)
     if res.returncode != 0: # exit on error
@@ -69,6 +63,7 @@ def download_playlist_json(url):
 url = sys.argv[1]
 
 # Get the playlist JSON first to get the playlist title
+print("Downloading playlist info for {url}".format(url = url))
 playlist_data = download_playlist_json(url)
 
 album = playlist_data["title"]
@@ -83,22 +78,28 @@ with open(Path(p, "playlist.info.json"), "w") as json_file:
 os.chdir(p)
 
 revisit = list()
+playlist_length = len(playlist_data["entries"])
+c = 0
 # Download each entry individually. This is more robust than downloading the
 # entire playlist because youtube-dl can not skip existing videos.
 for entry in playlist_data["entries"]:
+    c = c + 1
     json_file = "{title}_{id}.info.json".format(title = entry["title"], id = entry["id"])
     mp3_file  = "{title}_{id}.mp3".format(title = entry["title"], id = entry["id"])
     if Path(json_file).exists() and Path(mp3_file).exists():
-        res = tag_file(mp3_file, json_file)
-        if res != 0: revisit.append(mp3_file)
+        next
     else: # one of the necessary files do not exist, re-create JSON, download and tag
         with open(Path(json_file), "w") as f:
             json.dump(entry, f)
+        print("Downloading {title} ({n} of {n_all})".format(title = entry["title"], n = c, n_all = playlist_length))
         download_from_json(json_file)
-        tag_file(mp3_file, json_file)
+    print("Tagging {mp3}".format(mp3 = mp3_file))
+    res = tag_file(mp3_file, json_file)
+    if res != 0: revisit.append(mp3_file)
+    print() # empty line for structure
 
 if len(revisit): 
-    print("\n# Some files had errors while tagging, please revise:")
+    print("# Some files had errors while tagging, please revise:")
     for f in revisit:
         print("- {f}".format(f = f)) 
         
