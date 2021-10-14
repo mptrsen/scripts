@@ -48,7 +48,6 @@ def download_from_json(json_file):
         "--extract-audio",
         "--audio-format", "mp3",
         "--audio-quality", "192k",
-        "--write-info-json",
         "--retries", "5",
         "--continue" ]
     cmd_json = ytdl_cmd + [ "--load-info-json", json_file ]
