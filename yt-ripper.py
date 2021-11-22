@@ -46,7 +46,8 @@ def main(url):
                     "--audio-format", "mp3",
                     "--audio-quality", "192k",
                     "--retries", "5",
-                    "--continue" ]
+                    "--continue",
+                    "--output", "%(playlist_index)02d_%(title)s_%(id)s.%(ext)s" ]
         cmd_json = ytdl_cmd + [ "--load-info-json", json_file ]
         res = subprocess.run(cmd_json)
         if res.returncode != 0:
@@ -83,7 +84,7 @@ def main(url):
     # entire playlist because youtube-dl can not skip existing videos.
     for entry in playlist_data["entries"]:
         c = c + 1
-        json_file = "{title}_{id}.info.json".format(title = entry["title"], id = entry["id"])
+        json_file = "{index:02d}_{title}_{id}.info.json".format(index = entry["playlist_index"], title = entry["title"], id = entry["id"])
         mp3_file  = "{title}_{id}.mp3".format(title = entry["title"], id = entry["id"])
         if Path(json_file).exists() and Path(mp3_file).exists():
             next
