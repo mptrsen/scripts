@@ -84,6 +84,7 @@ def main(url):
     # entire playlist because youtube-dl can not skip existing videos.
     for entry in playlist_data["entries"]:
         c = c + 1
+        entry["title"]  = re.sub("\?", "", entry["title"]) # question marks are removed by youtube-dl
         json_file = "{index:02d}_{title}_{id}.info.json".format(index = entry["playlist_index"], title = entry["title"], id = entry["id"])
         mp3_file  = "{index:02d}_{title}_{id}.mp3".format(index = entry["playlist_index"], title = entry["title"], id = entry["id"])
         if Path(json_file).exists() and Path(mp3_file).exists():
