@@ -13,8 +13,31 @@ def main(url):
         with open(json_file) as f:
             data   = json.load(f)
         song   = data["title"]
-        artist = data["artist"]
-        year   = str(data["release_year"])
+        # fallback cascade for "artist"
+        artist = ""
+        try: data["artist"]
+        except KeyError: data["artist"] = None
+        try: data["creator"]
+        except KeyError: data["creator"] = None
+        try: data["uploader"]
+        except KeyError: data["uploader"] = None
+        if data["artist"] is not None:
+            artist = data["artist"]
+        elif data["creator"] is not None:
+            artist = data["creator"]
+        elif data["uploader"] is not None:
+            artist = data["uploader"]
+        else: sys.exit(1)
+
+        # fallback cascade for "release_year"
+        year = ""
+        try: data["release_year"]
+        except KeyError: data["release_year"] = None
+        if data["release_year"] is not None:
+            year   = str(data["release_year"])
+        else:
+            year = str(data["upload_date"])[0:4]
+
         album  = data["playlist"]
         track  = str(data["playlist_index"])
         problems = 0
@@ -85,6 +108,7 @@ def main(url):
     for entry in playlist_data["entries"]:
         c = c + 1
         entry["title"]  = re.sub("\?", "", entry["title"]) # question marks are removed by youtube-dl
+        entry["title"] = re.sub("\|+", "_", entry["title"]) # pipes replaced with _ by youtube-dl
         json_file = "{index:02d}_{title}_{id}.info.json".format(index = entry["playlist_index"], title = entry["title"], id = entry["id"])
         mp3_file  = "{index:02d}_{title}_{id}.mp3".format(index = entry["playlist_index"], title = entry["title"], id = entry["id"])
         if Path(json_file).exists() and Path(mp3_file).exists():
