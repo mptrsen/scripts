@@ -78,7 +78,7 @@ def main(url):
         ytdl_cmd = [ "youtube-dl",
                     "--extract-audio",
                     "--audio-format", "mp3",
-                    "--audio-quality", "192k",
+                    "--audio-quality", "320k",
                     "--retries", "5",
                     "--continue",
                     "--output", "%(playlist_index)02d_%(title)s_%(id)s.%(ext)s" ]
