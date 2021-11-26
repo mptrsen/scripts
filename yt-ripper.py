@@ -63,6 +63,17 @@ def main(url):
             problems = problems + 1
         return problems
 
+    def cleanup_title(filename):
+        """
+        This function removes special character (sequences) from the title to produce a safe file name.
+        youtube-dl does the same, so we need to reproduce the same pattern.
+        """
+        clean_tit = re.sub("\?",  "",    filename)  # question marks are removed by youtube-dl
+        clean_tit = re.sub("\|+", "_",   clean_tit) # pipes replaced with _ by youtube-dl
+        clean_tit = re.sub(": ",  " - ", clean_tit) # youtube-dl doesn't like :
+        clean_tit = re.sub('"',   "'",   clean_tit) # double quotes to single quotes
+        return clean_tit
+        
     def download_from_json(json_file):
         ytdl_cmd = [ "youtube-dl",
                     "--extract-audio",
@@ -103,19 +114,22 @@ def main(url):
     revisit = list()
     playlist_length = len(playlist_data["entries"])
     c = 0
-    # Download each entry individually. This is more robust than downloading the
-    # entire playlist because youtube-dl can not skip existing videos.
+    # Download each playlist json entry individually. This is more robust and
+    # flexible than downloading the entire playlist because youtube-dl can not
+    # skip existing videos.
     for entry in playlist_data["entries"]:
         c = c + 1
-        entry["title"]  = re.sub("\?", "", entry["title"]) # question marks are removed by youtube-dl
-        entry["title"] = re.sub("\|+", "_", entry["title"]) # pipes replaced with _ by youtube-dl
-        json_file = "{index:02d}_{title}_{id}.info.json".format(index = entry["playlist_index"], title = entry["title"], id = entry["id"])
-        mp3_file  = "{index:02d}_{title}_{id}.mp3".format(index = entry["playlist_index"], title = entry["title"], id = entry["id"])
-        if Path(json_file).exists() and Path(mp3_file).exists():
-            next
-        else: # one of the necessary files do not exist, re-create JSON, download and tag
+        clean_title = cleanup_title(entry["title"])
+        file_stem = "{index:02d}_{title}_{id}".format(index = entry["playlist_index"], title = clean_title, id = entry["id"])
+        json_file = file_stem + ".info.json"
+        mp3_file  = file_stem + ".mp3"
+        if not Path(json_file).exists():
             with open(Path(json_file), "w") as f:
                 json.dump(entry, f)
+        if Path(mp3_file).exists():
+            print("## mp3 file for \'{title}\' exists ({file}), skipping download".format(title = entry["title"], file = mp3_file))
+            next
+        else: # necessary file do not exist, re-create JSON, download and tag
             print("Downloading ({n} of {n_all}): {title}".format(title = entry["title"], n = c, n_all = playlist_length))
             download_from_json(json_file)
         print("Tagging: {mp3}".format(mp3 = mp3_file))
