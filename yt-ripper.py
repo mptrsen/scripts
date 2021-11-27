@@ -15,31 +15,27 @@ def tag_file(mp3_file, data):
     song   = data["title"]
     # fallback cascade for "artist"
     artist = ""
-    try: data["artist"]
-    except KeyError: data["artist"] = None
-    try: data["creator"]
-    except KeyError: data["creator"] = None
-    try: data["uploader"]
-    except KeyError: data["uploader"] = None
-    if data["artist"] is not None:
+    if "artist" in data:
         artist = data["artist"]
-    elif data["creator"] is not None:
+    elif "creator" in data:
         artist = data["creator"]
-    elif data["uploader"] is not None:
+    elif "uploader" in data:
         artist = data["uploader"]
     else: sys.exit(1)
 
     # fallback cascade for "release_year"
     year = ""
-    try: data["release_year"]
-    except KeyError: data["release_year"] = None
-    if data["release_year"] is not None:
+    if "release_year" in data:
         year   = str(data["release_year"])
     else:
         year = str(data["upload_date"])[0:4]
 
-    album  = data["playlist"]
-    track  = str(data["playlist_index"])
+    # fallback cascade for "playlist" and "playlist_index"
+    album = ""
+    track = None
+    if "playlist" in data:
+        album  = data["playlist"]
+        track  = str(data["playlist_index"])
     problems = 0
     if album  == None:
         album  = ""
@@ -47,16 +43,18 @@ def tag_file(mp3_file, data):
     if artist == None:
         artist = ""
         problems = problems + 1
-    if track  == None:
-        track  = ""
-        problems = problems + 1
+    if track is None:
+        track  = [ ]
+    else:
+        track = [ "--track", track ]
     # tag
     cmd = [ "id3v2", "--artist", artist,
         "--album", album,
         "--year", year,
-        "--track", track,
         "--song", song,
         mp3_file ]
+    if track is not None:
+        cmd[-1:-1] = track
     res = subprocess.run(cmd)
     if res.returncode != 0:
         print("Error tagging {title}".format(title = song))
@@ -93,7 +91,7 @@ def download_from_json(json_data, audio_format = "mp3", audio_quality = "320k", 
                 "--retries", "5",
                 "--continue",
                 "--output", output_template ]
-    json_file = get_file_stem(json_data) + ".info.json"
+    json_file = Path(get_file_stem(json_data) + ".info.json")
     with open(json_file, "w") as f:
         json.dump(json_data, f)
     cmd_json = ytdl_cmd + [ "--load-info-json", json_file ]
@@ -118,10 +116,8 @@ def download_playlist_json(url):
 
 def get_file_stem(json_data):
     clean_title = cleanup_title(json_data["title"])
-    print("Title: {title}".format(title = clean_title))
     # if part of a playlist
     if "playlist_index" in json_data and json_data["playlist_index"] is not None:
-        print("index: {ind}".format(ind = json_data["playlist_index"]))
         file_stem = "{index:02d}_{title}_{id}".format(index = json_data["playlist_index"], title = clean_title, id = json_data["id"])
     # otherwise file name without index
     else:
@@ -158,9 +154,7 @@ def download_playlist(json_data):
             print("Downloading ({n} of {n_all}): {title}".format(title = entry["title"], n = c, n_all = playlist_length))
             download_from_json(entry)
         print("Tagging: {mp3}".format(mp3 = mp3_file))
-        res = tag_file(mp3_file, json_file)
-        # clean up, remove JSON file
-        json_file.unlink()
+        res = tag_file(mp3_file, entry)
         if res != 0: revisit.append(mp3_file)
         print() # empty line for structure
 
