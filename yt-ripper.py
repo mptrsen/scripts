@@ -73,7 +73,7 @@ def main(url):
         clean_tit = re.sub(": ",  " - ", clean_tit) # youtube-dl doesn't like :
         clean_tit = re.sub('"',   "'",   clean_tit) # double quotes to single quotes
         return clean_tit
-        
+
     def download_from_json(json_file):
         ytdl_cmd = [ "youtube-dl",
                     "--extract-audio",
@@ -121,12 +121,12 @@ def main(url):
         c = c + 1
         clean_title = cleanup_title(entry["title"])
         file_stem = "{index:02d}_{title}_{id}".format(index = entry["playlist_index"], title = clean_title, id = entry["id"])
-        json_file = file_stem + ".info.json"
-        mp3_file  = file_stem + ".mp3"
-        if not Path(json_file).exists():
-            with open(Path(json_file), "w") as f:
+        json_file = Path(file_stem + ".info.json")
+        mp3_file  = Path(file_stem + ".mp3")
+        if not json_file.exists():
+            with open(json_file, "w") as f:
                 json.dump(entry, f)
-        if Path(mp3_file).exists():
+        if mp3_file.exists():
             print("## mp3 file for \'{title}\' exists ({file}), skipping download".format(title = entry["title"], file = mp3_file))
             next
         else: # necessary file do not exist, re-create JSON, download and tag
@@ -134,6 +134,8 @@ def main(url):
             download_from_json(json_file)
         print("Tagging: {mp3}".format(mp3 = mp3_file))
         res = tag_file(mp3_file, json_file)
+        # clean up
+        json_file.unlink()
         if res != 0: revisit.append(mp3_file)
         print() # empty line for structure
 
