@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 
 """
-Demultiplex a FASTQ file by barcode. The input file can be gzip compressed or
-not (determined by the file extension). The FASTQ header must be in Illumina
-format with colon-separated fields, the last one of which contains the barcode
-sequence.
+Demultiplex one or more FASTQ files by barcode. The input files can be gzip
+compressed or not (determined by the file extension). The FASTQ header must be
+in Illumina format with colon-separated fields, the last one of which contains
+the barcode sequence.
 
-Usage: fastq-demultiplex.py samples.csv reads.fastq
+Usage: fastq-demultiplex.py samples.csv reads.fastq [reads.fastq, ...] 
 
 This script requires two arguments: 
 (1) path to the dictionary file
@@ -97,7 +97,7 @@ class Demultiplexer:
         elif fastqfile.endswith(".fastq") or fastqfile.endswith(".fq"):
             fh = open(fastqfile, 'rb')
         else:
-            sys.exit("Unknown file format: " + fastqfile + ". I can read .fastq, .fq and .fq.gz")
+            sys.exit("Unknown file format: " + fastqfile + ". I can read .fastq, .fq, fastq.gz and .fq.gz")
 
         # do the parsing and sorting into files
         data = [ ]
@@ -136,11 +136,11 @@ class Demultiplexer:
 
 def main(sample_csv, fastq_files):
     dm = Demultiplexer(sample_csv) # argument: the sample CSV
-    for fastq in fastq_files:
-	dm.demultiplex(fastq) # argument: the FASTQ file
+    for fastq in fastq_files: # argument: the FASTQ files
+	dm.demultiplex(fastq)
     dm.print_report()
 
 if __name__ == "__main__":
     if len(sys.argv) <= 3:
-        sys.exit("I need two arguments: (1) the samples CSV file; and (2) the FASTQ file")
+        sys.exit("I need two arguments: (1) the samples CSV file; and (2) the FASTQ file(s)")
     main(sys.argv[1], sys.argv[2:])
