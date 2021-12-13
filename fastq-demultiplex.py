@@ -6,11 +6,11 @@ not (determined by the file extension). The FASTQ header must be in Illumina
 format with colon-separated fields, the last one of which contains the barcode
 sequence.
 
-Usage: fastq-demultiplex.py reads.fastq samples.csv
+Usage: fastq-demultiplex.py samples.csv reads.fastq
 
 This script requires two arguments: 
-(1) path to the FASTQ file
-(2) path to the dictionary file
+(1) path to the dictionary file
+(2) path to the FASTQ file
 
 The dictionary file specifies which barcode belongs to which sample. It must be
 in comma-separated text format, with each line looking like this:
@@ -134,12 +134,13 @@ class Demultiplexer:
             print(sample + ": " + str(self.num_records_written[sample]) + " records")
         print("Total: " + str(self.total_records_written) + " records")
 
-def main():
-    if len(sys.argv) != 3:
-        sys.exit("I need two arguments: (1) the FASTQ file and (2) the samples CSV file")
-    dm = Demultiplexer(sys.argv[2]) # argument: the sample CSV
-    dm.demultiplex(sys.argv[1]) # argument: the FASTQ file
+def main(sample_csv, fastq_files):
+    dm = Demultiplexer(sample_csv) # argument: the sample CSV
+    for fastq in fastq_files:
+	dm.demultiplex(fastq) # argument: the FASTQ file
     dm.print_report()
 
 if __name__ == "__main__":
-    main()
+    if len(sys.argv) <= 3:
+        sys.exit("I need two arguments: (1) the samples CSV file; and (2) the FASTQ file")
+    main(sys.argv[1], sys.argv[2:])
