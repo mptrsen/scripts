@@ -64,13 +64,13 @@ def tag_file(mp3_file, data):
 def cleanup_title(filename):
     """
     This function removes special character (sequences) from the title to produce a safe file name.
-    youtube-dl does the same, so we need to reproduce the same pattern.
+    yt-dlp does the same, so we need to reproduce the same pattern.
     """
-    clean_tit = re.sub("\?",  "",    filename)  # question marks are removed by youtube-dl
-    clean_tit = re.sub("\|+", "_",   clean_tit) # pipes replaced with _ by youtube-dl
-    clean_tit = re.sub(": ",  " - ", clean_tit) # youtube-dl doesn't like :
-    clean_tit = re.sub('"',   "'",   clean_tit) # double quotes to single quotes
-    return clean_tit
+    clean_title = re.sub("\\?",  "",    filename)  # question marks are removed by yt-dlp
+    clean_title = re.sub("\\|+", "_",   clean_title) # pipes replaced with _ by yt-dlp
+    clean_title = re.sub(": ",  " - ", clean_title) # yt-dlp doesn't like :
+    clean_title = re.sub('"',   "'",   clean_title) # double quotes to single quotes
+    return clean_title
 
 def output_template(index = True):
     if index == False:
@@ -84,7 +84,7 @@ def download_from_json(json_data, audio_format = "mp3", audio_quality = "320k", 
     "%(playlist_index)02d_%(title)s_%(id)s.%(ext)s" 
     This obviously only works completely if the video is embedded in a playlist
     """
-    ytdl_cmd = [ "youtube-dl",
+    ytdl_cmd = [ "yt-dlp",
                 "--extract-audio",
                 "--audio-format", audio_format,
                 "--audio-quality", audio_quality,
@@ -106,7 +106,7 @@ def download_playlist_json(url):
     """
     Download and dump playlist JSON to a single file
     """
-    cmd = [ "youtube-dl", "--dump-single-json", url ]
+    cmd = [ "yt-dlp", "--dump-single-json", url ]
     res = subprocess.run(cmd, capture_output = True)
     if res.returncode != 0: # exit on error
         print("Error downloading playlist JSON")
@@ -126,7 +126,7 @@ def get_file_stem(json_data):
 
 def download_playlist(json_data):
     album = json_data["title"]
-    album = re.sub("[^\w]", "_", album)
+    album = re.sub("[^\\w]", "_", album)
     print("# Playlist title: {album}\n".format(album = album))
 
     # Create new directory, dump the playlist JSON, and change there
@@ -140,7 +140,7 @@ def download_playlist(json_data):
     playlist_length = len(json_data["entries"])
     c = 0
     # Download each playlist json entry individually. This is more robust and
-    # flexible than downloading the entire playlist because youtube-dl can not
+    # flexible than downloading the entire playlist because yt-dlp can not
     # skip existing videos.
     for entry in json_data["entries"]:
         c = c + 1
